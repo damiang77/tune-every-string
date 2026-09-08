@@ -1,0 +1,24 @@
+{
+  "meta": {
+    "title": "Stroik online",
+    "description": "Spokojny, prywatny stroik online do gitary i basu."
+  },
+  "brand": {
+    "tagline": "Spokojne miejsce do strojenia"
+  },
+  "navigation": {
+    "language": "Język"
+  },
+  "tuner": {
+    "eyebrow": "Stroik do gitary i basu",
+    "heading": "Stroik",
+    "intro": "Skupiona przestrzeń do strojenia przed każdą sesją.",
+    "mode": "Automatyczny tryb prowadzony",
+    "reference": "Dźwięk wzorcowy",
+    "frequency": "440 Hz",
+    "waiting": "Gotowy na Twój instrument",
+    "instruction": "Strojenie przez mikrofon pojawi się w następnej wersji.",
+    "supported": "Najpierw dla gitary i basu",
+    "privacy": "Dźwięk będzie przetwarzany na tym urządzeniu. Nic nie zostanie wysłane."
+  }
+}

@@ -1,0 +1,25 @@
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '08:00'
+      timezone: Europe/Warsaw
+    groups:
+      security-updates:
+        applies-to: security-updates
+        patterns:
+          - '*'
+      production-dependencies:
+        applies-to: version-updates
+        dependency-type: production
+        patterns:
+          - '*'
+      development-dependencies:
+        applies-to: version-updates
+        dependency-type: development
+        patterns:
+          - '*'

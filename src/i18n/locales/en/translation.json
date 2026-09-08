@@ -1,0 +1,24 @@
+{
+  "meta": {
+    "title": "Browser tuner",
+    "description": "A calm, private browser tuner for guitar and bass."
+  },
+  "brand": {
+    "tagline": "A calm place to tune"
+  },
+  "navigation": {
+    "language": "Language"
+  },
+  "tuner": {
+    "eyebrow": "Guitar and bass tuner",
+    "heading": "Tuner",
+    "intro": "A focused tuning space for every practice session.",
+    "mode": "Automatic guided mode",
+    "reference": "Reference pitch",
+    "frequency": "440 Hz",
+    "waiting": "Ready for your instrument",
+    "instruction": "Microphone tuning arrives in the next build.",
+    "supported": "Built first for guitar and bass",
+    "privacy": "Audio will be processed on this device. Nothing will be uploaded."
+  }
+}
