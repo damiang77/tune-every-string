@@ -232,12 +232,55 @@
   font-weight: 750;
 }
 
+.selectionGrid {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 22px 32px 0;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background: var(--color-surface-soft);
+}
+
+.selectionGrid div {
+  min-width: 0;
+  padding: 11px 13px 12px;
+  border-right: 1px solid var(--color-border);
+}
+
+.selectionGrid div:last-child {
+  border-right: 0;
+}
+
+.selectionGrid dt {
+  overflow: hidden;
+  margin-bottom: 3px;
+  color: var(--color-text-subtle);
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.selectionGrid dd {
+  overflow: hidden;
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .meter {
   position: relative;
   display: grid;
-  min-height: 235px;
+  min-height: 205px;
   place-items: center;
-  margin: 7px 28px 0;
+  margin: 0 28px;
   overflow: hidden;
 }
 
@@ -286,6 +329,10 @@
   transform-origin: bottom center;
 }
 
+.needlePlaying {
+  animation: listening-pulse 1.6s ease-in-out infinite;
+}
+
 .pitchPlaceholder {
   position: relative;
   margin-top: 38px;
@@ -294,6 +341,10 @@
   font-weight: 300;
   letter-spacing: -0.08em;
   line-height: 1;
+}
+
+.pitchPlaying {
+  color: var(--color-accent-strong);
 }
 
 .status {
@@ -315,24 +366,85 @@
   line-height: 1.5;
 }
 
+.error {
+  color: var(--color-warm-strong);
+}
+
 .stringRow {
   display: flex;
   justify-content: center;
   gap: 9px;
-  margin: 24px 0 27px;
+  margin: 22px 0 18px;
 }
 
 .stringChip {
+  appearance: none;
   display: grid;
-  width: 38px;
-  height: 38px;
+  width: 43px;
+  height: 43px;
   place-items: center;
   border: 1px solid var(--color-border);
   border-radius: 50%;
   background: var(--color-surface-soft);
   color: var(--color-text-muted);
+  cursor: pointer;
   font-size: 0.76rem;
   font-weight: 750;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.stringChip:hover {
+  border-color: var(--color-border-strong);
+  transform: translateY(-2px);
+}
+
+.stringChip[aria-pressed='true'] {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 13%, var(--color-surface));
+  color: var(--color-accent-strong);
+}
+
+.stringChip:focus-visible,
+.toneButton:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--color-accent) 46%, transparent);
+  outline-offset: 3px;
+}
+
+.toneButton {
+  display: flex;
+  width: calc(100% - 64px);
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 0 32px 26px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--color-text);
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--color-text) 16%, transparent);
+  color: var(--color-surface);
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 800;
+  transition:
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.toneButton:hover {
+  background: var(--color-accent-strong);
+  transform: translateY(-1px);
+}
+
+.toneButtonIcon {
+  display: grid;
+  width: 18px;
+  place-items: center;
+  font-size: 0.62rem;
 }
 
 .cardFooter {
@@ -381,6 +493,19 @@
   margin: 0;
 }
 
+@keyframes listening-pulse {
+  0%,
+  100% {
+    opacity: 0.7;
+    transform: scaleY(0.85);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scaleY(1.05);
+  }
+}
+
 @media (max-width: 820px) {
   .shell {
     padding-top: 20px;
@@ -412,6 +537,18 @@
     justify-self: center;
   }
 
+  .selectionGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .selectionGrid div:nth-child(2) {
+    border-right: 0;
+  }
+
+  .selectionGrid div:nth-child(-n + 2) {
+    border-bottom: 1px solid var(--color-border);
+  }
+
   .footer {
     justify-content: center;
     margin-top: 15px;
@@ -425,11 +562,22 @@
   }
 
   .main {
-    margin-top: 55px;
+    gap: 24px;
+    margin-top: 36px;
   }
 
   .intro h1 {
-    font-size: clamp(3.3rem, 17vw, 5rem);
+    max-width: none;
+    font-size: clamp(2.8rem, 13vw, 3.4rem);
+    line-height: 0.94;
+  }
+
+  .eyebrow {
+    margin-bottom: 12px;
+  }
+
+  .lede {
+    display: none;
   }
 
   .tunerCard {
@@ -445,17 +593,49 @@
   }
 
   .meter {
-    min-height: 210px;
+    min-height: 140px;
     margin-right: 18px;
     margin-left: 18px;
   }
 
+  .meterArc {
+    top: 35px;
+  }
+
+  .tickRow {
+    top: 36px;
+  }
+
+  .needle {
+    top: 38px;
+    height: 70px;
+  }
+
+  .pitchPlaceholder {
+    margin-top: 22px;
+    font-size: 4rem;
+  }
+
   .stringRow {
     gap: 6px;
+    margin-top: 16px;
+    margin-bottom: 14px;
   }
 
   .stringChip {
-    width: 34px;
-    height: 34px;
+    width: 39px;
+    height: 39px;
+  }
+
+  .selectionGrid {
+    margin-right: 22px;
+    margin-left: 22px;
+  }
+
+  .toneButton {
+    width: calc(100% - 44px);
+    margin-right: 22px;
+    margin-bottom: 20px;
+    margin-left: 22px;
   }
 }

@@ -13,12 +13,39 @@
     "eyebrow": "Stroik do gitary i basu",
     "heading": "Stroik",
     "intro": "Skupiona przestrzeń do strojenia przed każdą sesją.",
-    "mode": "Automatyczny tryb prowadzony",
     "reference": "Dźwięk wzorcowy",
     "frequency": "440 Hz",
-    "waiting": "Gotowy na Twój instrument",
-    "instruction": "Strojenie przez mikrofon pojawi się w następnej wersji.",
-    "supported": "Najpierw dla gitary i basu",
+    "selection": {
+      "instrument": {
+        "label": "Instrument",
+        "guitar": "Gitara"
+      },
+      "preset": {
+        "label": "Strój",
+        "standard": "Standardowy"
+      },
+      "method": {
+        "label": "Metoda strojenia",
+        "referenceTone": "Dźwięk wzorcowy"
+      },
+      "mode": {
+        "label": "Tryb strojenia",
+        "guided": "Prowadzony"
+      },
+      "string": {
+        "label": "Struna"
+      }
+    },
+    "status": {
+      "ready": "Wybierz strunę i posłuchaj jej docelowego dźwięku.",
+      "playing": "{{noteName}} gra do momentu zatrzymania.",
+      "error": "Nie udało się uruchomić dźwięku wzorcowego. Sprawdź dźwięk w przeglądarce i spróbuj ponownie."
+    },
+    "action": {
+      "play": "Odtwórz {{noteName}}",
+      "stop": "Zatrzymaj {{noteName}}"
+    },
+    "standardGuitar": "Gitara sześciostrunowa · Strój standardowy",
     "privacy": "Dźwięk będzie przetwarzany na tym urządzeniu. Nic nie zostanie wysłane."
   }
 }

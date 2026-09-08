@@ -1,12 +1,13 @@
+import { useSyncExternalStore } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 
 import { brand } from '../config/brand'
 import type { Locale } from '../i18n/i18n'
+import type { TuningSession } from '../tuning/TuningSession'
 import styles from './TunerScreen.module.css'
 
 const meterTicks = Array.from({ length: 21 }, (_, index) => index)
-const guitarStrings = ['E', 'A', 'D', 'G', 'B', 'E']
 
 function BrandMark() {
   return (
@@ -18,8 +19,26 @@ function BrandMark() {
   )
 }
 
-export function TunerScreen({ locale }: { locale: Locale }) {
+export function TunerScreen({
+  locale,
+  session,
+}: {
+  locale: Locale
+  session: TuningSession
+}) {
   const { t } = useTranslation()
+  const snapshot = useSyncExternalStore(session.subscribe, session.getSnapshot)
+  const isPlaying = snapshot.referenceToneStatus === 'playing'
+
+  function selectString(stringId: string) {
+    void session.dispatch({ type: 'select-string', stringId })
+  }
+
+  function toggleReferenceTone() {
+    void session.dispatch({
+      type: isPlaying ? 'stop' : 'play-reference-tone',
+    })
+  }
 
   return (
     <div className={styles.shell}>
@@ -65,7 +84,9 @@ export function TunerScreen({ locale }: { locale: Locale }) {
         <section className={styles.tunerCard} aria-labelledby="tuner-heading">
           <div className={styles.cardHeader}>
             <div>
-              <p className={styles.modeLabel}>{t('tuner.mode')}</p>
+              <p className={styles.modeLabel}>
+                {t('tuner.selection.method.referenceTone')}
+              </p>
               <h2 id="tuner-heading">{t('tuner.heading')}</h2>
             </div>
             <div className={styles.referencePitch}>
@@ -73,6 +94,25 @@ export function TunerScreen({ locale }: { locale: Locale }) {
               <strong>{t('tuner.frequency')}</strong>
             </div>
           </div>
+
+          <dl className={styles.selectionGrid}>
+            <div>
+              <dt>{t('tuner.selection.instrument.label')}</dt>
+              <dd>{t('tuner.selection.instrument.guitar')}</dd>
+            </div>
+            <div>
+              <dt>{t('tuner.selection.preset.label')}</dt>
+              <dd>{t('tuner.selection.preset.standard')}</dd>
+            </div>
+            <div>
+              <dt>{t('tuner.selection.method.label')}</dt>
+              <dd>{t('tuner.selection.method.referenceTone')}</dd>
+            </div>
+            <div>
+              <dt>{t('tuner.selection.mode.label')}</dt>
+              <dd>{t('tuner.selection.mode.guided')}</dd>
+            </div>
+          </dl>
 
           <div className={styles.meter} aria-hidden="true">
             <div className={styles.meterArc} />
@@ -84,26 +124,76 @@ export function TunerScreen({ locale }: { locale: Locale }) {
                 />
               ))}
             </div>
-            <div className={styles.needle} />
-            <div className={styles.pitchPlaceholder}>–</div>
+            <div
+              className={`${styles.needle} ${isPlaying ? styles.needlePlaying : ''}`}
+            />
+            <div
+              className={`${styles.pitchPlaceholder} ${isPlaying ? styles.pitchPlaying : ''}`}
+            >
+              {snapshot.selectedString.noteName}
+            </div>
           </div>
 
-          <div className={styles.status}>
-            <p className={styles.waiting}>{t('tuner.waiting')}</p>
-            <p className={styles.instruction}>{t('tuner.instruction')}</p>
+          <div
+            aria-atomic="true"
+            className={styles.status}
+            role={snapshot.referenceToneError ? 'alert' : 'status'}
+          >
+            <p
+              className={`${styles.waiting} ${snapshot.referenceToneError ? styles.error : ''}`}
+            >
+              {snapshot.referenceToneError
+                ? t('tuner.status.error')
+                : isPlaying
+                  ? t('tuner.status.playing', {
+                      noteName: snapshot.selectedString.noteName,
+                    })
+                  : t('tuner.status.ready')}
+            </p>
+            <p className={styles.instruction}>
+              {snapshot.selectedString.frequencyHz.toFixed(2)} Hz
+            </p>
           </div>
 
-          <div className={styles.stringRow} aria-hidden="true">
-            {guitarStrings.map((string, index) => (
-              <span className={styles.stringChip} key={`${string}-${index}`}>
-                {string}
-              </span>
+          <div
+            className={styles.stringRow}
+            aria-label={t('tuner.selection.string.label')}
+            role="group"
+          >
+            {snapshot.strings.map((string) => (
+              <button
+                aria-label={string.noteName}
+                aria-pressed={string.id === snapshot.selectedString.id}
+                className={styles.stringChip}
+                key={string.id}
+                onClick={() => selectString(string.id)}
+                type="button"
+              >
+                {string.noteName}
+              </button>
             ))}
           </div>
 
+          <button
+            className={styles.toneButton}
+            onClick={toggleReferenceTone}
+            type="button"
+          >
+            <span className={styles.toneButtonIcon} aria-hidden="true">
+              {isPlaying ? '■' : '▶'}
+            </span>
+            {isPlaying
+              ? t('tuner.action.stop', {
+                  noteName: snapshot.selectedString.noteName,
+                })
+              : t('tuner.action.play', {
+                  noteName: snapshot.selectedString.noteName,
+                })}
+          </button>
+
           <div className={styles.cardFooter}>
             <span className={styles.statusDot} />
-            {t('tuner.supported')}
+            {t('tuner.standardGuitar')}
           </div>
         </section>
       </main>

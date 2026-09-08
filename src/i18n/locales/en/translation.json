@@ -13,12 +13,39 @@
     "eyebrow": "Guitar and bass tuner",
     "heading": "Tuner",
     "intro": "A focused tuning space for every practice session.",
-    "mode": "Automatic guided mode",
     "reference": "Reference pitch",
     "frequency": "440 Hz",
-    "waiting": "Ready for your instrument",
-    "instruction": "Microphone tuning arrives in the next build.",
-    "supported": "Built first for guitar and bass",
+    "selection": {
+      "instrument": {
+        "label": "Instrument",
+        "guitar": "Guitar"
+      },
+      "preset": {
+        "label": "Tuning preset",
+        "standard": "Standard"
+      },
+      "method": {
+        "label": "Tuning method",
+        "referenceTone": "Reference tone"
+      },
+      "mode": {
+        "label": "Tuning mode",
+        "guided": "Guided"
+      },
+      "string": {
+        "label": "String"
+      }
+    },
+    "status": {
+      "ready": "Choose a String and hear its Target Pitch.",
+      "playing": "{{noteName}} keeps playing until you stop it.",
+      "error": "The Reference Tone could not start. Check browser audio and try again."
+    },
+    "action": {
+      "play": "Play {{noteName}}",
+      "stop": "Stop {{noteName}}"
+    },
+    "standardGuitar": "Six-string guitar · Standard tuning",
     "privacy": "Audio will be processed on this device. Nothing will be uploaded."
   }
 }

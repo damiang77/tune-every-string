@@ -43,6 +43,7 @@
   --color-accent: #36b88a;
   --color-accent-strong: #167a5c;
   --color-warm: #f3a66f;
+  --color-warm-strong: #9d4e20;
   --shadow-soft: 0 8px 28px rgb(42 51 47 / 6%);
   --shadow-card: 0 28px 90px rgb(42 51 47 / 12%);
 
@@ -93,6 +94,7 @@ a:focus-visible {
     --color-accent: #56d6a7;
     --color-accent-strong: #78e1ba;
     --color-warm: #dc8a59;
+    --color-warm-strong: #f2ad82;
     --shadow-soft: 0 8px 28px rgb(0 0 0 / 16%);
     --shadow-card: 0 28px 90px rgb(0 0 0 / 30%);
   }
@@ -102,6 +104,8 @@ a:focus-visible {
   *,
   *::before,
   *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
   }
