@@ -23,6 +23,30 @@ function BrandMark() {
   )
 }
 
+function DecorativeElements() {
+  return (
+    <div aria-hidden="true" className={styles.decorations}>
+      <span className={`${styles.deco} ${styles.decoStarLarge}`}>
+        <svg viewBox="0 0 32 32">
+          <path d="M16 2 17.5 14.5 30 16 17.5 17.5 16 30 14.5 17.5 2 16 14.5 14.5Z" />
+        </svg>
+      </span>
+      <span className={`${styles.deco} ${styles.decoStarSmall}`}>
+        <svg viewBox="0 0 32 32">
+          <path d="M16 2 17.5 14.5 30 16 17.5 17.5 16 30 14.5 17.5 2 16 14.5 14.5Z" />
+        </svg>
+      </span>
+      <span className={`${styles.deco} ${styles.decoBlob}`} />
+      <span className={`${styles.deco} ${styles.decoSquiggle}`}>
+        <svg viewBox="0 0 74 30">
+          <path d="M3 18c8-18 16 17 25 0S45 35 54 18 68 7 71 14" />
+        </svg>
+      </span>
+      <span className={`${styles.deco} ${styles.decoDots}`} />
+    </div>
+  )
+}
+
 export function TunerScreen({
   locale,
   session,
@@ -85,7 +109,7 @@ export function TunerScreen({
 
   return (
     <div className={styles.shell}>
-      <div aria-hidden="true" className={styles.glow} />
+      <DecorativeElements />
 
       <header className={styles.header}>
         <Link className={styles.brand} to={locale === 'pl' ? '/pl' : '/'}>
