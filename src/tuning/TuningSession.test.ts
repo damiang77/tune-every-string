@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
 import { guitarStandardTuning } from './TuningCatalog'
+import {
+  createMcleodPitchEstimator,
+  type PitchEstimation,
+  type PitchEstimator,
+} from './McleodPitchEstimator'
 import { createTuningSession, type ReferenceToneOutput } from './TuningSession'
 import type {
   MicrophoneCapture,
@@ -10,19 +15,23 @@ import type {
 
 class ControlledMicrophoneInput implements MicrophoneInput {
   readonly starts: MicrophoneStartOptions[] = []
-  readonly capture: MicrophoneCapture = {
-    appliedSettings: {
-      autoGainControl: false,
-      channelCount: 1,
-      deviceId: 'built-in',
-      echoCancellation: false,
-      noiseSuppression: false,
-    },
-    sampleRateHz: 48_000,
-  }
+  readonly capture: MicrophoneCapture
   stopCount = 0
   private resolveStart: ((capture: MicrophoneCapture) => void) | undefined
   private rejectStart: ((error: unknown) => void) | undefined
+
+  constructor(sampleRateHz = 48_000) {
+    this.capture = {
+      appliedSettings: {
+        autoGainControl: false,
+        channelCount: 1,
+        deviceId: 'built-in',
+        echoCancellation: false,
+        noiseSuppression: false,
+      },
+      sampleRateHz,
+    }
+  }
 
   start(options: MicrophoneStartOptions) {
     this.starts.push(options)
@@ -51,6 +60,47 @@ class ControlledMicrophoneInput implements MicrophoneInput {
       samples: Float32Array.from(samples),
     })
   }
+}
+
+class DeferredPitchEstimator implements PitchEstimator {
+  private pending: ((estimation: PitchEstimation) => void) | undefined
+
+  estimate() {
+    return new Promise<PitchEstimation>((resolve) => {
+      this.pending = resolve
+    })
+  }
+
+  resolve(estimation: PitchEstimation) {
+    if (!this.pending) throw new Error('No pitch estimate is pending')
+    const resolve = this.pending
+    this.pending = undefined
+    resolve(estimation)
+  }
+}
+
+function createSineFrame(
+  frequencyHz: number,
+  sampleRateHz = 48_000,
+  amplitude = 0.5,
+) {
+  return Array.from(
+    { length: 4_096 },
+    (_, index) =>
+      amplitude * Math.sin((2 * Math.PI * frequencyHz * index) / sampleRateHz),
+  )
+}
+
+function createNoiseFrame() {
+  let state = 123_456_789
+  return Array.from({ length: 4_096 }, () => {
+    state = (1_103_515_245 * state + 12_345) % 2_147_483_648
+    return (state / 2_147_483_648 - 0.5) * 0.5
+  })
+}
+
+async function flushPitchEstimation() {
+  await new Promise((resolve) => setTimeout(resolve, 0))
 }
 
 class RecordingToneOutput implements ReferenceToneOutput {
@@ -152,6 +202,91 @@ describe('Tuning Session', () => {
     })
   })
 
+  it('requires stable Detected Pitch before reporting In Tune', async () => {
+    const microphoneInput = new ControlledMicrophoneInput()
+    const session = createTuningSession({
+      microphoneInput,
+      pitchEstimator: createMcleodPitchEstimator(),
+      referenceToneOutput: new RecordingToneOutput(),
+    })
+    const start = session.dispatch({ type: 'start-listening' })
+    microphoneInput.finishStart()
+    await start
+    await session.dispatch({ type: 'select-string', stringId: 'guitar-5' })
+
+    for (const [index, frequencyHz] of [109.8, 110.2].entries()) {
+      microphoneInput.sendFrame(createSineFrame(frequencyHz), index * 40)
+      await flushPitchEstimation()
+      expect(session.getSnapshot().pitchFeedback).toBe('acquiring')
+    }
+
+    microphoneInput.sendFrame(createSineFrame(110), 80)
+    await flushPitchEstimation()
+
+    expect(session.getSnapshot()).toMatchObject({
+      detectedPitch: {
+        centsDeviation: expect.closeTo(0, 1),
+        frequencyHz: expect.closeTo(110, 1),
+      },
+      pitchFeedback: 'in-tune',
+    })
+
+    microphoneInput.sendFrame(createSineFrame(110), 120)
+    expect(session.getSnapshot().pitchFeedback).toBe('in-tune')
+    await flushPitchEstimation()
+  })
+
+  it('does not let smoothing turn an out-of-tune reading into a stable result', async () => {
+    const microphoneInput = new ControlledMicrophoneInput()
+    const session = createTuningSession({
+      microphoneInput,
+      pitchEstimator: createMcleodPitchEstimator(),
+      referenceToneOutput: new RecordingToneOutput(),
+    })
+    const start = session.dispatch({ type: 'start-listening' })
+    microphoneInput.finishStart()
+    await start
+    await session.dispatch({ type: 'select-string', stringId: 'guitar-5' })
+
+    for (const [index, frequencyHz] of [110, 110, 112].entries()) {
+      microphoneInput.sendFrame(createSineFrame(frequencyHz), index * 40)
+      await flushPitchEstimation()
+    }
+
+    expect(session.getSnapshot()).toMatchObject({
+      detectedPitch: { frequencyHz: expect.closeTo(110, 1) },
+      pitchFeedback: 'acquiring',
+    })
+  })
+
+  it('discards a pending estimate when the selected String changes', async () => {
+    const microphoneInput = new ControlledMicrophoneInput()
+    const pitchEstimator = new DeferredPitchEstimator()
+    const session = createTuningSession({
+      microphoneInput,
+      pitchEstimator,
+      referenceToneOutput: new RecordingToneOutput(),
+    })
+    const start = session.dispatch({ type: 'start-listening' })
+    microphoneInput.finishStart()
+    await start
+
+    microphoneInput.sendFrame(createSineFrame(82.407), 0)
+    await session.dispatch({ type: 'select-string', stringId: 'guitar-5' })
+    pitchEstimator.resolve({
+      clarity: 1,
+      frequencyHz: 82.407,
+      signalLevel: 0.4,
+    })
+    await flushPitchEstimation()
+
+    expect(session.getSnapshot()).toMatchObject({
+      detectedPitch: null,
+      pitchFeedback: 'acquiring',
+      selectedString: { noteName: 'A2' },
+    })
+  })
+
   it('publishes signal level and frame timing without retaining microphone frames', async () => {
     const microphoneInput = new ControlledMicrophoneInput()
     const session = createTuningSession({
@@ -176,6 +311,143 @@ describe('Tuning Session', () => {
 
     microphoneInput.sendFrame([0, 0, 0, 0], 180)
     expect(session.getSnapshot().pitchFeedback).toBe('no-signal')
+  })
+
+  it('uses the audio context sample rate to estimate Detected Pitch', async () => {
+    const microphoneInput = new ControlledMicrophoneInput(44_100)
+    const session = createTuningSession({
+      microphoneInput,
+      pitchEstimator: createMcleodPitchEstimator(),
+      referenceToneOutput: new RecordingToneOutput(),
+    })
+    const start = session.dispatch({ type: 'start-listening' })
+    microphoneInput.finishStart()
+    await start
+    await session.dispatch({ type: 'select-string', stringId: 'guitar-4' })
+
+    microphoneInput.sendFrame(createSineFrame(146.832, 44_100), 0)
+    await flushPitchEstimation()
+
+    expect(session.getSnapshot()).toMatchObject({
+      detectedPitch: { frequencyHz: expect.closeTo(146.832, 2) },
+      diagnostics: { sampleRateHz: 44_100 },
+    })
+  })
+
+  it('estimates the highest Standard Guitar String without an octave error', async () => {
+    const microphoneInput = new ControlledMicrophoneInput()
+    const session = createTuningSession({
+      microphoneInput,
+      pitchEstimator: createMcleodPitchEstimator(),
+      referenceToneOutput: new RecordingToneOutput(),
+    })
+    const start = session.dispatch({ type: 'start-listening' })
+    microphoneInput.finishStart()
+    await start
+    await session.dispatch({ type: 'select-string', stringId: 'guitar-1' })
+
+    microphoneInput.sendFrame(createSineFrame(329.628), 0)
+    await flushPitchEstimation()
+
+    expect(session.getSnapshot().detectedPitch?.frequencyHz).toBeCloseTo(
+      329.628,
+      1,
+    )
+  })
+
+  it('rejects silence and unreliable noise before publishing Detected Pitch', async () => {
+    const microphoneInput = new ControlledMicrophoneInput()
+    const session = createTuningSession({
+      microphoneInput,
+      pitchEstimator: createMcleodPitchEstimator(),
+      referenceToneOutput: new RecordingToneOutput(),
+    })
+    const start = session.dispatch({ type: 'start-listening' })
+    microphoneInput.finishStart()
+    await start
+
+    microphoneInput.sendFrame(createSineFrame(82.407, 48_000, 0.001), 0)
+    await flushPitchEstimation()
+    expect(session.getSnapshot()).toMatchObject({
+      detectedPitch: null,
+      pitchFeedback: 'no-signal',
+    })
+
+    microphoneInput.sendFrame(createNoiseFrame(), 40)
+    await flushPitchEstimation()
+    expect(session.getSnapshot()).toMatchObject({
+      detectedPitch: null,
+      pitchFeedback: 'acquiring',
+    })
+  })
+
+  it('reports a clean Detected Pitch against the selected Guitar String', async () => {
+    const microphoneInput = new ControlledMicrophoneInput()
+    const session = createTuningSession({
+      microphoneInput,
+      pitchEstimator: createMcleodPitchEstimator(),
+      referenceToneOutput: new RecordingToneOutput(),
+    })
+    const start = session.dispatch({ type: 'start-listening' })
+    microphoneInput.finishStart()
+    await start
+    await session.dispatch({ type: 'select-string', stringId: 'guitar-5' })
+
+    microphoneInput.sendFrame(createSineFrame(108), 100)
+    await flushPitchEstimation()
+
+    expect(session.getSnapshot()).toMatchObject({
+      detectedPitch: {
+        centsDeviation: expect.closeTo(-31.77, 1),
+        clarity: expect.any(Number),
+        frequencyHz: expect.closeTo(108, 1),
+      },
+      pitchFeedback: 'too-low',
+      selectedString: { noteName: 'A2' },
+    })
+    expect(session.getSnapshot().detectedPitch?.clarity).toBeGreaterThan(0.95)
+  })
+
+  it('reports Too High for a Detected Pitch above the selected String', async () => {
+    const microphoneInput = new ControlledMicrophoneInput()
+    const session = createTuningSession({
+      microphoneInput,
+      pitchEstimator: createMcleodPitchEstimator(),
+      referenceToneOutput: new RecordingToneOutput(),
+    })
+    const start = session.dispatch({ type: 'start-listening' })
+    microphoneInput.finishStart()
+    await start
+    await session.dispatch({ type: 'select-string', stringId: 'guitar-5' })
+
+    microphoneInput.sendFrame(createSineFrame(112), 0)
+    await flushPitchEstimation()
+
+    expect(session.getSnapshot()).toMatchObject({
+      detectedPitch: { centsDeviation: expect.closeTo(31.19, 1) },
+      pitchFeedback: 'too-high',
+    })
+  })
+
+  it('reports Too High for a Detected Pitch above the selected String', async () => {
+    const microphoneInput = new ControlledMicrophoneInput()
+    const session = createTuningSession({
+      microphoneInput,
+      pitchEstimator: createMcleodPitchEstimator(),
+      referenceToneOutput: new RecordingToneOutput(),
+    })
+    const start = session.dispatch({ type: 'start-listening' })
+    microphoneInput.finishStart()
+    await start
+    await session.dispatch({ type: 'select-string', stringId: 'guitar-5' })
+
+    microphoneInput.sendFrame(createSineFrame(112), 0)
+    await flushPitchEstimation()
+
+    expect(session.getSnapshot()).toMatchObject({
+      detectedPitch: { centsDeviation: expect.closeTo(31.19, 1) },
+      pitchFeedback: 'too-high',
+    })
   })
 
   it('cancels unresolved permission and switches to Reference Tone', async () => {

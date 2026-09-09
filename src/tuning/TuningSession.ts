@@ -18,6 +18,14 @@ import type {
   AccidentalPreference,
   TuningPreferenceStore,
 } from './TuningPreferences'
+import type { PitchEstimator } from './McleodPitchEstimator'
+import {
+  createPitchFeedbackTracker,
+  type DetectedPitch,
+  type PitchFeedback,
+} from './PitchFeedbackTracker'
+
+export type { DetectedPitch, PitchFeedback } from './PitchFeedbackTracker'
 
 export interface ReferenceToneOutput {
   play(frequencyHz: number): Promise<void>
@@ -30,7 +38,6 @@ export type MicrophoneError =
   | 'microphone-unsupported'
   | 'microphone-unreadable'
 
-export type PitchFeedback = 'no-signal' | 'acquiring'
 export type TuningMethod = 'listen' | 'reference-tone'
 
 export interface AudioDeviceSettings {
@@ -85,6 +92,7 @@ export interface TuningSessionSnapshot {
     sampleRateHz: number | null
     signalLevel: number
   }>
+  readonly detectedPitch: DetectedPitch | null
   readonly referenceToneError: 'audio-unavailable' | null
   readonly referenceToneStatus: 'stopped' | 'playing'
   readonly selectedString: TuningString
@@ -131,6 +139,7 @@ export interface TuningSession {
 interface CreateTuningSessionOptions {
   readonly initialTuningMethod?: TuningSessionSnapshot['tuningMethod']
   readonly microphoneInput?: MicrophoneInput
+  readonly pitchEstimator?: PitchEstimator
   readonly referenceToneOutput: ReferenceToneOutput
   readonly concertPitchHz?: number
   readonly instrument?: Instrument
@@ -162,6 +171,7 @@ export function createTuningSession({
   initialTuningMethod = 'reference-tone',
   instrument: instrumentInput = guitar,
   microphoneInput,
+  pitchEstimator,
   preferenceStore,
   referenceToneOutput,
   tuningPreset: tuningPresetInput = guitarStandardTuning,
@@ -253,7 +263,16 @@ export function createTuningSession({
   let signalLevel = 0
   let frameIntervalMs: number | null = null
   let lastFrameAtMs: number | null = null
+  let detectedPitch: TuningSessionSnapshot['detectedPitch'] = null
+  let estimationInFlight = false
+  const pitchFeedbackTracker = createPitchFeedbackTracker()
   let microphoneAbortController: AbortController | undefined
+
+  function resetPitchTracking(nextPitchFeedback: PitchFeedback) {
+    detectedPitch = null
+    pitchFeedbackTracker.reset()
+    pitchFeedback = nextPitchFeedback
+  }
 
   function getSelectedTarget(): TargetPitch {
     return tuningMode === 'guided' ? selectedString : chromaticTarget
@@ -280,6 +299,7 @@ export function createTuningSession({
         sampleRateHz,
         signalLevel,
       }),
+      detectedPitch,
       referenceToneError,
       referenceToneStatus,
       selectedString,
@@ -319,7 +339,7 @@ export function createTuningSession({
       tuningMethod = 'listen'
       lifecycleStatus = 'starting'
       microphoneError = null
-      pitchFeedback = 'no-signal'
+      resetPitchTracking('no-signal')
       appliedAudioSettings = null
       sampleRateHz = null
       signalLevel = 0
@@ -352,10 +372,51 @@ export function createTuningSession({
             frameIntervalMs =
               lastFrameAtMs === null ? null : frame.capturedAtMs - lastFrameAtMs
             lastFrameAtMs = frame.capturedAtMs
-            pitchFeedback = signalLevel >= 0.01 ? 'acquiring' : 'no-signal'
+            if (!pitchEstimator) {
+              pitchFeedback = signalLevel >= 0.01 ? 'acquiring' : 'no-signal'
+            }
             publishSnapshot()
+
+            if (!pitchEstimator || estimationInFlight) return
+            estimationInFlight = true
+            const estimatedStringId = selectedString.id
+            void pitchEstimator
+              .estimate(frame.samples, sampleRateHz ?? captureSampleRateHz)
+              .then((estimation) => {
+                if (
+                  controller.signal.aborted ||
+                  lifecycleStatus !== 'listening' ||
+                  selectedString.id !== estimatedStringId
+                ) {
+                  return
+                }
+
+                signalLevel = estimation.signalLevel
+                const trackingResult = pitchFeedbackTracker.update(
+                  estimation,
+                  selectedString.frequencyHz,
+                )
+                detectedPitch = trackingResult.detectedPitch
+                pitchFeedback = trackingResult.pitchFeedback
+                publishSnapshot()
+              })
+              .catch(() => {
+                if (
+                  controller.signal.aborted ||
+                  lifecycleStatus !== 'listening'
+                ) {
+                  return
+                }
+                resetPitchTracking('acquiring')
+                publishSnapshot()
+              })
+              .finally(() => {
+                estimationInFlight = false
+              })
           },
         })
+
+        const captureSampleRateHz = capture.sampleRateHz
 
         if (controller.signal.aborted) {
           await microphoneInput.stop()
@@ -388,7 +449,7 @@ export function createTuningSession({
         if (lifecycleStatus === 'listening') await microphoneInput?.stop()
         lifecycleStatus = 'inactive'
         microphoneError = null
-        pitchFeedback = 'no-signal'
+        resetPitchTracking('no-signal')
       } else if (referenceToneStatus === 'playing') {
         await referenceToneOutput.stop()
         referenceToneStatus = 'stopped'
@@ -492,6 +553,9 @@ export function createTuningSession({
 
       selectedString = nextString
       referenceToneError = null
+      resetPitchTracking(
+        lifecycleStatus === 'listening' ? 'acquiring' : 'no-signal',
+      )
 
       if (tuningMode === 'guided') {
         await retunePlayingReferenceTone(selectedString)
@@ -508,7 +572,7 @@ export function createTuningSession({
         microphoneAbortController?.abort()
         await microphoneInput?.stop()
         lifecycleStatus = 'inactive'
-        pitchFeedback = 'no-signal'
+        resetPitchTracking('no-signal')
       }
       tuningMethod = 'reference-tone'
       microphoneError = null
@@ -529,7 +593,7 @@ export function createTuningSession({
       microphoneAbortController?.abort()
       await microphoneInput?.stop()
       lifecycleStatus = 'inactive'
-      pitchFeedback = 'no-signal'
+      resetPitchTracking('no-signal')
       publishSnapshot()
       return
     }

@@ -38,6 +38,15 @@ export function TunerScreen({
     tuningMethod === 'listen'
       ? t('tuner.selection.method.listen')
       : t('tuner.selection.method.referenceTone')
+  const pitchFeedbackLabel = () => {
+    if (snapshot.pitchFeedback === 'no-signal')
+      return t('tuner.status.noSignal')
+    if (snapshot.pitchFeedback === 'acquiring')
+      return t('tuner.status.acquiring')
+    if (snapshot.pitchFeedback === 'too-low') return t('tuner.status.tooLow')
+    if (snapshot.pitchFeedback === 'too-high') return t('tuner.status.tooHigh')
+    return t('tuner.status.inTune')
+  }
   function selectString(stringId: string) {
     void session.dispatch({ type: 'select-string', stringId })
   }
@@ -333,11 +342,16 @@ export function TunerScreen({
               {snapshot.microphoneError
                 ? t('tuner.status.failed')
                 : isListen && snapshot.lifecycleStatus === 'listening'
-                  ? t(
-                      snapshot.pitchFeedback === 'acquiring'
-                        ? 'tuner.status.acquiring'
-                        : 'tuner.status.noSignal',
-                    )
+                  ? snapshot.detectedPitch
+                    ? t('tuner.status.detectedPitch', {
+                        cents: Math.abs(
+                          snapshot.detectedPitch.centsDeviation,
+                        ).toFixed(1),
+                        frequency:
+                          snapshot.detectedPitch.frequencyHz.toFixed(2),
+                        result: pitchFeedbackLabel(),
+                      })
+                    : pitchFeedbackLabel()
                   : isListen
                     ? null
                     : `${snapshot.targetPitch.frequencyHz.toFixed(2)} Hz`}
