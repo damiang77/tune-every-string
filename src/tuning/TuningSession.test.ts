@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { guitarStandardTuning } from './TuningCatalog'
 import { createTuningSession, type ReferenceToneOutput } from './TuningSession'
 
 class RecordingToneOutput implements ReferenceToneOutput {
@@ -47,6 +48,21 @@ class FlakyToneOutput implements ReferenceToneOutput {
     this.playCount += 1
 
     return this.playCount === 1
+      ? Promise.reject(new Error('Audio output unavailable'))
+      : Promise.resolve()
+  }
+
+  stop() {
+    return Promise.resolve()
+  }
+}
+
+class RetuneFailureOutput implements ReferenceToneOutput {
+  playCount = 0
+
+  play() {
+    this.playCount += 1
+    return this.playCount === 2
       ? Promise.reject(new Error('Audio output unavailable'))
       : Promise.resolve()
   }
@@ -238,5 +254,188 @@ describe('Tuning Session', () => {
         referenceToneOutput,
       }),
     ).toThrow('Concert Pitch must be between 430 and 450 Hz')
+  })
+
+  it('plays in Chromatic Mode without losing the Guided Mode selection', async () => {
+    const referenceToneOutput = new RecordingToneOutput()
+    const session = createTuningSession({ referenceToneOutput })
+
+    await session.dispatch({ type: 'select-string', stringId: 'guitar-5' })
+    await session.dispatch({
+      type: 'select-tuning-mode',
+      tuningMode: 'chromatic',
+    })
+
+    expect(session.getSnapshot()).toMatchObject({
+      chromaticTarget: {
+        frequencyHz: 440,
+        midiNoteNumber: 69,
+        noteName: 'A4',
+      },
+      selectedString: { noteName: 'A2' },
+      tuningMode: 'chromatic',
+    })
+
+    await session.dispatch({ type: 'play-reference-tone' })
+    expect(referenceToneOutput.playedFrequencies).toEqual([440])
+
+    await session.dispatch({ type: 'select-tuning-mode', tuningMode: 'guided' })
+    expect(referenceToneOutput.playedFrequencies.at(-1)).toBe(110)
+    expect(session.getSnapshot()).toMatchObject({
+      selectedString: { noteName: 'A2' },
+      tuningMode: 'guided',
+    })
+  })
+
+  it('recalibrates Guided and Chromatic Target Pitches during a Tuning Session', async () => {
+    const referenceToneOutput = new RecordingToneOutput()
+    const session = createTuningSession({ referenceToneOutput })
+
+    await session.dispatch({
+      type: 'select-tuning-mode',
+      tuningMode: 'chromatic',
+    })
+    await session.dispatch({ type: 'play-reference-tone' })
+    await session.dispatch({ type: 'set-concert-pitch', concertPitchHz: 442 })
+
+    expect(referenceToneOutput.playedFrequencies).toEqual([440, 442])
+    expect(session.getSnapshot()).toMatchObject({
+      chromaticTarget: { frequencyHz: 442, noteName: 'A4' },
+      concertPitchHz: 442,
+    })
+    expect(
+      session.getSnapshot().strings.find(({ noteName }) => noteName === 'A2'),
+    ).toMatchObject({ frequencyHz: 110.5 })
+
+    await expect(
+      session.dispatch({ type: 'set-concert-pitch', concertPitchHz: 451 }),
+    ).rejects.toThrow('Concert Pitch must be between 430 and 450 Hz')
+    expect(session.getSnapshot().concertPitchHz).toBe(442)
+  })
+
+  it('selects Chromatic notes and remembers the Accidental Preference', async () => {
+    let savedPreference: 'sharps' | 'flats' | undefined
+    const preferenceStore = {
+      loadAccidentalPreference: () => savedPreference,
+      saveAccidentalPreference: (preference: 'sharps' | 'flats') => {
+        savedPreference = preference
+      },
+    }
+    const referenceToneOutput = new RecordingToneOutput()
+    const session = createTuningSession({
+      preferenceStore,
+      referenceToneOutput,
+    })
+
+    expect(session.getSnapshot().accidentalPreference).toBe('sharps')
+    expect(session.getSnapshot().chromaticNoteOptions.slice(0, 2)).toEqual([
+      { noteName: 'C', pitchClass: 0 },
+      { noteName: 'C♯', pitchClass: 1 },
+    ])
+    expect(session.getSnapshot().chromaticOctaveOptions).toEqual([
+      1, 2, 3, 4, 5, 6, 7,
+    ])
+
+    await session.dispatch({
+      type: 'select-tuning-mode',
+      tuningMode: 'chromatic',
+    })
+    await session.dispatch({ type: 'play-reference-tone' })
+    await session.dispatch({ type: 'select-chromatic-note', pitchClass: 1 })
+    await session.dispatch({ type: 'select-chromatic-octave', octave: 5 })
+    expect(referenceToneOutput.playedFrequencies).toEqual([
+      440,
+      expect.closeTo(277.183, 3),
+      expect.closeTo(554.365, 3),
+    ])
+    expect(session.getSnapshot().chromaticTarget).toMatchObject({
+      midiNoteNumber: 73,
+      noteName: 'C♯5',
+    })
+
+    await session.dispatch({
+      type: 'set-accidental-preference',
+      accidentalPreference: 'flats',
+    })
+    expect(savedPreference).toBe('flats')
+    expect(session.getSnapshot().chromaticTarget.noteName).toBe('D♭5')
+
+    const restoredSession = createTuningSession({
+      preferenceStore,
+      referenceToneOutput: new RecordingToneOutput(),
+    })
+    await restoredSession.dispatch({
+      type: 'select-chromatic-note',
+      pitchClass: 1,
+    })
+    expect(restoredSession.getSnapshot()).toMatchObject({
+      accidentalPreference: 'flats',
+      chromaticTarget: { noteName: 'D♭4' },
+    })
+  })
+
+  it('keeps a Tuning Preset conventional spelling when Chromatic Mode uses sharps', async () => {
+    const flatPreset = {
+      ...guitarStandardTuning,
+      id: 'half-step-down',
+      name: 'Half Step Down',
+      targets: guitarStandardTuning.targets.map((target, index) =>
+        index === 0
+          ? { ...target, midiNoteNumber: 39, noteName: 'E♭2' }
+          : target,
+      ),
+    }
+    const session = createTuningSession({
+      referenceToneOutput: new RecordingToneOutput(),
+      tuningPreset: flatPreset,
+    })
+
+    await session.dispatch({
+      type: 'set-accidental-preference',
+      accidentalPreference: 'sharps',
+    })
+
+    expect(session.getSnapshot().strings[0]?.noteName).toBe('E♭2')
+  })
+
+  it('selects Target Pitches at both ends of the supported Chromatic range', async () => {
+    const session = createTuningSession({
+      referenceToneOutput: new RecordingToneOutput(),
+    })
+
+    await session.dispatch({ type: 'select-chromatic-note', pitchClass: 0 })
+    await session.dispatch({ type: 'select-chromatic-octave', octave: 1 })
+    expect(session.getSnapshot().chromaticTarget).toMatchObject({
+      frequencyHz: expect.closeTo(32.703, 3),
+      midiNoteNumber: 24,
+      noteName: 'C1',
+    })
+
+    await session.dispatch({ type: 'select-chromatic-note', pitchClass: 11 })
+    await session.dispatch({ type: 'select-chromatic-octave', octave: 7 })
+    expect(session.getSnapshot().chromaticTarget).toMatchObject({
+      frequencyHz: expect.closeTo(3951.066, 3),
+      midiNoteNumber: 107,
+      noteName: 'B7',
+    })
+  })
+
+  it('keeps the selected mode when audio output fails while retuning', async () => {
+    const session = createTuningSession({
+      referenceToneOutput: new RetuneFailureOutput(),
+    })
+
+    await session.dispatch({ type: 'play-reference-tone' })
+    await session.dispatch({
+      type: 'select-tuning-mode',
+      tuningMode: 'chromatic',
+    })
+
+    expect(session.getSnapshot()).toMatchObject({
+      referenceToneError: 'audio-unavailable',
+      referenceToneStatus: 'stopped',
+      targetPitch: { noteName: 'A4' },
+      tuningMode: 'chromatic',
+    })
   })
 })

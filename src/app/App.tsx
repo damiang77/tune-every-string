@@ -9,6 +9,7 @@ import {
   type TuningSession,
 } from '../tuning/TuningSession'
 import { createWebAudioReferenceTone } from '../tuning/WebAudioReferenceTone'
+import { createBrowserTuningPreferenceStore } from '../tuning/TuningPreferences'
 import { TunerScreen } from './TunerScreen'
 
 function LocalizedTunerScreen({
@@ -49,6 +50,7 @@ export function App({ session: providedSession }: { session?: TuningSession }) {
     () =>
       providedSession ??
       createTuningSession({
+        preferenceStore: createBrowserTuningPreferenceStore(),
         referenceToneOutput: createWebAudioReferenceTone(),
       }),
   )

@@ -4,6 +4,10 @@ import { Link } from 'react-router-dom'
 
 import { brand } from '../config/brand'
 import type { Locale } from '../i18n/i18n'
+import type {
+  ChromaticOctave,
+  ChromaticPitchClass,
+} from '../tuning/ChromaticPitch'
 import type { TuningSession } from '../tuning/TuningSession'
 import styles from './TunerScreen.module.css'
 
@@ -29,7 +33,6 @@ export function TunerScreen({
   const { t } = useTranslation()
   const snapshot = useSyncExternalStore(session.subscribe, session.getSnapshot)
   const isPlaying = snapshot.referenceToneStatus === 'playing'
-
   function selectString(stringId: string) {
     void session.dispatch({ type: 'select-string', stringId })
   }
@@ -38,6 +41,21 @@ export function TunerScreen({
     void session.dispatch({
       type: isPlaying ? 'stop' : 'play-reference-tone',
     })
+  }
+
+  function selectTuningMode(tuningMode: 'guided' | 'chromatic') {
+    void session.dispatch({ type: 'select-tuning-mode', tuningMode })
+  }
+
+  function setConcertPitch(concertPitchHz: number) {
+    if (
+      !Number.isFinite(concertPitchHz) ||
+      concertPitchHz < 430 ||
+      concertPitchHz > 450
+    ) {
+      return
+    }
+    void session.dispatch({ type: 'set-concert-pitch', concertPitchHz })
   }
 
   return (
@@ -89,10 +107,37 @@ export function TunerScreen({
               </p>
               <h2 id="tuner-heading">{t('tuner.heading')}</h2>
             </div>
-            <div className={styles.referencePitch}>
-              <span>{t('tuner.reference')}</span>
-              <strong>{t('tuner.frequency')}</strong>
-            </div>
+            <label className={styles.referencePitch}>
+              <span>{t('tuner.concertPitch')}</span>
+              <span className={styles.frequencyInput}>
+                <input
+                  aria-label={t('tuner.concertPitch')}
+                  defaultValue={snapshot.concertPitchHz}
+                  inputMode="numeric"
+                  key={snapshot.concertPitchHz}
+                  max="450"
+                  min="430"
+                  onBlur={(event) => {
+                    const concertPitchHz = event.currentTarget.valueAsNumber
+                    if (
+                      !Number.isFinite(concertPitchHz) ||
+                      concertPitchHz < 430 ||
+                      concertPitchHz > 450
+                    ) {
+                      event.currentTarget.value = String(
+                        snapshot.concertPitchHz,
+                      )
+                    }
+                  }}
+                  onChange={(event) =>
+                    setConcertPitch(event.currentTarget.valueAsNumber)
+                  }
+                  step="1"
+                  type="number"
+                />
+                Hz
+              </span>
+            </label>
           </div>
 
           <dl className={styles.selectionGrid}>
@@ -110,9 +155,95 @@ export function TunerScreen({
             </div>
             <div>
               <dt>{t('tuner.selection.mode.label')}</dt>
-              <dd>{t('tuner.selection.mode.guided')}</dd>
+              <dd>{t(`tuner.selection.mode.${snapshot.tuningMode}`)}</dd>
             </div>
           </dl>
+
+          <div
+            aria-label={t('tuner.selection.mode.label')}
+            className={styles.modeSwitch}
+            role="group"
+          >
+            {(['guided', 'chromatic'] as const).map((tuningMode) => (
+              <button
+                aria-pressed={snapshot.tuningMode === tuningMode}
+                className={styles.modeButton}
+                key={tuningMode}
+                onClick={() => selectTuningMode(tuningMode)}
+                type="button"
+              >
+                {t(`tuner.selection.mode.${tuningMode}`)}
+              </button>
+            ))}
+          </div>
+
+          {snapshot.tuningMode === 'chromatic' ? (
+            <div className={styles.chromaticControls}>
+              <label>
+                <span>{t('tuner.chromatic.note')}</span>
+                <select
+                  aria-label={t('tuner.chromatic.note')}
+                  onChange={(event) =>
+                    void session.dispatch({
+                      type: 'select-chromatic-note',
+                      pitchClass: Number(
+                        event.currentTarget.value,
+                      ) as ChromaticPitchClass,
+                    })
+                  }
+                  value={snapshot.chromaticSelection.pitchClass}
+                >
+                  {snapshot.chromaticNoteOptions.map((option) => (
+                    <option key={option.pitchClass} value={option.pitchClass}>
+                      {option.noteName}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>{t('tuner.chromatic.octave')}</span>
+                <select
+                  aria-label={t('tuner.chromatic.octave')}
+                  onChange={(event) =>
+                    void session.dispatch({
+                      type: 'select-chromatic-octave',
+                      octave: Number(
+                        event.currentTarget.value,
+                      ) as ChromaticOctave,
+                    })
+                  }
+                  value={snapshot.chromaticSelection.octave}
+                >
+                  {snapshot.chromaticOctaveOptions.map((octave) => (
+                    <option key={octave} value={octave}>
+                      {octave}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div
+                aria-label={t('tuner.chromatic.accidentalPreference')}
+                className={styles.accidentalSwitch}
+                role="group"
+              >
+                {(['sharps', 'flats'] as const).map((preference) => (
+                  <button
+                    aria-pressed={snapshot.accidentalPreference === preference}
+                    key={preference}
+                    onClick={() =>
+                      void session.dispatch({
+                        type: 'set-accidental-preference',
+                        accidentalPreference: preference,
+                      })
+                    }
+                    type="button"
+                  >
+                    {t(`tuner.chromatic.${preference}`)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
 
           <div className={styles.meter} aria-hidden="true">
             <div className={styles.meterArc} />
@@ -130,7 +261,7 @@ export function TunerScreen({
             <div
               className={`${styles.pitchPlaceholder} ${isPlaying ? styles.pitchPlaying : ''}`}
             >
-              {snapshot.selectedString.noteName}
+              <span data-target-note>{snapshot.targetPitch.noteName}</span>
             </div>
           </div>
 
@@ -146,33 +277,41 @@ export function TunerScreen({
                 ? t('tuner.status.error')
                 : isPlaying
                   ? t('tuner.status.playing', {
-                      noteName: snapshot.selectedString.noteName,
+                      noteName: snapshot.targetPitch.noteName,
                     })
-                  : t('tuner.status.ready')}
+                  : snapshot.tuningMode === 'guided'
+                    ? t('tuner.status.ready')
+                    : t('tuner.status.readyChromatic')}
             </p>
             <p className={styles.instruction}>
-              {snapshot.selectedString.frequencyHz.toFixed(2)} Hz
+              {snapshot.targetPitch.frequencyHz.toFixed(2)} Hz
             </p>
           </div>
 
-          <div
-            className={styles.stringRow}
-            aria-label={t('tuner.selection.string.label')}
-            role="group"
-          >
-            {snapshot.strings.map((string) => (
-              <button
-                aria-label={string.noteName}
-                aria-pressed={string.id === snapshot.selectedString.id}
-                className={styles.stringChip}
-                key={string.id}
-                onClick={() => selectString(string.id)}
-                type="button"
-              >
-                {string.noteName}
-              </button>
-            ))}
-          </div>
+          {snapshot.tuningMode === 'guided' ? (
+            <div
+              className={styles.stringRow}
+              aria-label={t('tuner.selection.string.label')}
+              role="group"
+            >
+              {snapshot.strings.map((string) => (
+                <button
+                  aria-label={string.noteName}
+                  aria-pressed={string.id === snapshot.selectedString.id}
+                  className={styles.stringChip}
+                  key={string.id}
+                  onClick={() => selectString(string.id)}
+                  type="button"
+                >
+                  {string.noteName}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className={styles.chromaticRange}>
+              {t('tuner.chromatic.supportedRange')}
+            </p>
+          )}
 
           <button
             className={styles.toneButton}
@@ -184,16 +323,18 @@ export function TunerScreen({
             </span>
             {isPlaying
               ? t('tuner.action.stop', {
-                  noteName: snapshot.selectedString.noteName,
+                  noteName: snapshot.targetPitch.noteName,
                 })
               : t('tuner.action.play', {
-                  noteName: snapshot.selectedString.noteName,
+                  noteName: snapshot.targetPitch.noteName,
                 })}
           </button>
 
           <div className={styles.cardFooter}>
             <span className={styles.statusDot} />
-            {t('tuner.standardGuitar')}
+            {snapshot.tuningMode === 'guided'
+              ? t('tuner.standardGuitar')
+              : t('tuner.chromatic.footer')}
           </div>
         </section>
       </main>

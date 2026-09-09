@@ -64,6 +64,10 @@ _Avoid_: Manual mode, forced string
 A Tuning Mode that interprets a Detected Pitch independently of any Instrument or Tuning Preset.
 _Avoid_: Free mode
 
+**Accidental Preference**:
+The player's choice to spell Chromatic Mode Note Names with sharps or flats. Tuning Presets do not use this preference.
+_Avoid_: Notation mode, enharmonic setting
+
 **Reference Tone**:
 An audible Target Pitch that a player can match by ear.
 _Avoid_: Sample note, test tone

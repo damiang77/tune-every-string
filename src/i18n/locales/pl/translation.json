@@ -13,8 +13,7 @@
     "eyebrow": "Stroik do gitary i basu",
     "heading": "Stroik",
     "intro": "Skupiona przestrzeń do strojenia przed każdą sesją.",
-    "reference": "Dźwięk wzorcowy",
-    "frequency": "440 Hz",
+    "concertPitch": "Strój koncertowy",
     "selection": {
       "instrument": {
         "label": "Instrument",
@@ -30,14 +29,25 @@
       },
       "mode": {
         "label": "Tryb strojenia",
-        "guided": "Prowadzony"
+        "guided": "Prowadzony",
+        "chromatic": "Chromatyczny"
       },
       "string": {
         "label": "Struna"
       }
     },
+    "chromatic": {
+      "note": "Dźwięk",
+      "octave": "Oktawa",
+      "accidentalPreference": "Znaki chromatyczne",
+      "sharps": "Krzyżyki",
+      "flats": "Bemole",
+      "supportedRange": "Chromatyczne dźwięki wzorcowe obejmują zakres od C1 do B7.",
+      "footer": "Chromatyczny dźwięk wzorcowy · C1–B7"
+    },
     "status": {
       "ready": "Wybierz strunę i posłuchaj jej docelowego dźwięku.",
+      "readyChromatic": "Wybierz dźwięk i oktawę, a następnie posłuchaj dźwięku docelowego.",
       "playing": "{{noteName}} gra do momentu zatrzymania.",
       "error": "Nie udało się uruchomić dźwięku wzorcowego. Sprawdź dźwięk w przeglądarce i spróbuj ponownie."
     },

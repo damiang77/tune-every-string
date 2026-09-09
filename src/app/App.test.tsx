@@ -37,6 +37,7 @@ class UnavailableToneOutput implements ReferenceToneOutput {
 describe('application routes', () => {
   afterEach(() => {
     cleanup()
+    window.localStorage.clear()
     window.history.replaceState({}, '', '/')
     document.title = ''
     document.querySelector('meta[name="description"]')?.remove()
@@ -114,5 +115,41 @@ describe('application routes', () => {
       'The Reference Tone could not start. Check browser audio and try again.',
     )
     expect(screen.getByRole('button', { name: 'Play E2' })).toBeVisible()
+  })
+
+  it('selects and calibrates a Chromatic Reference Tone while preserving the Guided String', async () => {
+    const user = userEvent.setup()
+    const referenceToneOutput = new RecordingToneOutput()
+    const session = createTuningSession({ referenceToneOutput })
+
+    render(<App session={session} />)
+    await user.click(screen.getByRole('button', { name: 'A2' }))
+    await user.click(screen.getByRole('button', { name: 'Chromatic' }))
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Note' }),
+      '1',
+    )
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Octave' }),
+      '5',
+    )
+    await user.clear(screen.getByRole('spinbutton', { name: 'Concert pitch' }))
+    await user.type(
+      screen.getByRole('spinbutton', { name: 'Concert pitch' }),
+      '442',
+    )
+    await user.click(screen.getByRole('button', { name: 'Flats' }))
+
+    expect(
+      screen.getByText('D♭5', { selector: '[data-target-note]' }),
+    ).toBeVisible()
+    expect(screen.getByText('556.89 Hz')).toBeVisible()
+
+    await user.click(screen.getByRole('button', { name: 'Play D♭5' }))
+    expect(referenceToneOutput.playedFrequencies.at(-1)).toBeCloseTo(556.89, 2)
+
+    await user.click(screen.getByRole('button', { name: 'Guided' }))
+    expect(screen.getByRole('button', { name: 'Stop A2' })).toBeVisible()
+    expect(referenceToneOutput.playedFrequencies.at(-1)).toBe(110.5)
   })
 })

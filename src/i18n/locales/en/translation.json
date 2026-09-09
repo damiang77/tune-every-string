@@ -13,8 +13,7 @@
     "eyebrow": "Guitar and bass tuner",
     "heading": "Tuner",
     "intro": "A focused tuning space for every practice session.",
-    "reference": "Reference pitch",
-    "frequency": "440 Hz",
+    "concertPitch": "Concert pitch",
     "selection": {
       "instrument": {
         "label": "Instrument",
@@ -30,14 +29,25 @@
       },
       "mode": {
         "label": "Tuning mode",
-        "guided": "Guided"
+        "guided": "Guided",
+        "chromatic": "Chromatic"
       },
       "string": {
         "label": "String"
       }
     },
+    "chromatic": {
+      "note": "Note",
+      "octave": "Octave",
+      "accidentalPreference": "Accidental preference",
+      "sharps": "Sharps",
+      "flats": "Flats",
+      "supportedRange": "Chromatic Reference Tones support C1 through B7.",
+      "footer": "Chromatic Reference Tone · C1–B7"
+    },
     "status": {
       "ready": "Choose a String and hear its Target Pitch.",
+      "readyChromatic": "Choose a note and octave, then hear the Target Pitch.",
       "playing": "{{noteName}} keeps playing until you stop it.",
       "error": "The Reference Tone could not start. Check browser audio and try again."
     },

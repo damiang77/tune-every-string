@@ -7,6 +7,7 @@ const PEAK_GAIN = 0.16
 interface Voice {
   readonly gain: GainNode
   readonly oscillator: OscillatorNode
+  readonly startedAt: number
 }
 
 class WebAudioReferenceTone implements ReferenceToneOutput {
@@ -34,7 +35,7 @@ class WebAudioReferenceTone implements ReferenceToneOutput {
     gain.connect(audioContext.destination)
     oscillator.start(now)
 
-    this.activeVoice = { gain, oscillator }
+    this.activeVoice = { gain, oscillator, startedAt: now }
   }
 
   async stop() {
@@ -62,9 +63,20 @@ class WebAudioReferenceTone implements ReferenceToneOutput {
     if (!voice) return Promise.resolve()
 
     const stopAt = now + RELEASE_SECONDS
-    voice.gain.gain.cancelScheduledValues(now)
-    voice.gain.gain.setValueAtTime(voice.gain.gain.value, now)
-    voice.gain.gain.linearRampToValueAtTime(0, stopAt)
+    const gainParameter = voice.gain.gain
+
+    if (typeof gainParameter.cancelAndHoldAtTime === 'function') {
+      gainParameter.cancelAndHoldAtTime(now)
+    } else {
+      const attackProgress = Math.min(
+        1,
+        Math.max(0, (now - voice.startedAt) / ATTACK_SECONDS),
+      )
+      gainParameter.cancelScheduledValues(now)
+      gainParameter.setValueAtTime(PEAK_GAIN * attackProgress, now)
+    }
+
+    gainParameter.linearRampToValueAtTime(0, stopAt)
 
     return new Promise<void>((resolve) => {
       voice.oscillator.addEventListener(

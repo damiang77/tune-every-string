@@ -216,6 +216,7 @@
 
 .referencePitch {
   display: grid;
+  justify-items: end;
   gap: 4px;
   padding-top: 3px;
   text-align: right;
@@ -227,9 +228,30 @@
   font-weight: 650;
 }
 
-.referencePitch strong {
+.frequencyInput {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
   font-size: 0.88rem;
   font-weight: 750;
+}
+
+.frequencyInput input {
+  width: 48px;
+  padding: 2px 3px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  text-align: right;
+}
+
+.frequencyInput input:hover,
+.frequencyInput input:focus-visible {
+  border-color: var(--color-border-strong);
+  outline: none;
+  background: var(--color-surface-soft);
 }
 
 .selectionGrid {
@@ -273,6 +295,81 @@
   font-weight: 750;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.modeSwitch {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin: 12px 32px 0;
+  padding: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: 13px;
+  background: var(--color-surface-soft);
+}
+
+.modeButton,
+.accidentalSwitch button {
+  min-height: 36px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+
+.modeButton[aria-pressed='true'],
+.accidentalSwitch button[aria-pressed='true'] {
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-soft);
+  color: var(--color-accent-strong);
+}
+
+.chromaticControls {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 0.65fr) minmax(0, 1.55fr);
+  gap: 8px;
+  margin: 12px 32px 0;
+}
+
+.chromaticControls label {
+  display: grid;
+  gap: 5px;
+  color: var(--color-text-subtle);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.chromaticControls select {
+  width: 100%;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface-soft);
+  color: var(--color-text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 750;
+  text-transform: none;
+}
+
+.accidentalSwitch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-self: end;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface-soft);
 }
 
 .meter {
@@ -377,6 +474,14 @@
   margin: 22px 0 18px;
 }
 
+.chromaticRange {
+  margin: 22px 24px 18px;
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  font-weight: 650;
+  text-align: center;
+}
+
 .stringChip {
   appearance: none;
   display: grid;
@@ -409,7 +514,10 @@
 }
 
 .stringChip:focus-visible,
-.toneButton:focus-visible {
+.toneButton:focus-visible,
+.modeButton:focus-visible,
+.accidentalSwitch button:focus-visible,
+.chromaticControls select:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--color-accent) 46%, transparent);
   outline-offset: 3px;
 }
@@ -562,18 +670,18 @@
   }
 
   .main {
-    gap: 24px;
-    margin-top: 36px;
+    gap: 16px;
+    margin-top: 24px;
   }
 
   .intro h1 {
     max-width: none;
-    font-size: clamp(2.8rem, 13vw, 3.4rem);
+    font-size: clamp(2.35rem, 11vw, 2.9rem);
     line-height: 0.94;
   }
 
   .eyebrow {
-    margin-bottom: 12px;
+    display: none;
   }
 
   .lede {
@@ -585,15 +693,19 @@
   }
 
   .cardHeader {
-    padding: 24px 22px 0;
+    padding: 20px 22px 0;
   }
 
-  .referencePitch span {
+  .referencePitch > span:first-child {
     display: none;
   }
 
+  .selectionGrid {
+    margin-top: 16px;
+  }
+
   .meter {
-    min-height: 140px;
+    min-height: 124px;
     margin-right: 18px;
     margin-left: 18px;
   }
@@ -608,12 +720,12 @@
 
   .needle {
     top: 38px;
-    height: 70px;
+    height: 62px;
   }
 
   .pitchPlaceholder {
-    margin-top: 22px;
-    font-size: 4rem;
+    margin-top: 18px;
+    font-size: 3.6rem;
   }
 
   .stringRow {
@@ -632,10 +744,25 @@
     margin-left: 22px;
   }
 
+  .modeSwitch,
+  .chromaticControls {
+    margin-right: 22px;
+    margin-left: 22px;
+  }
+
+  .chromaticControls {
+    grid-template-columns: 0.7fr 0.7fr 1.6fr;
+  }
+
+  .chromaticRange {
+    margin-top: 14px;
+    margin-bottom: 14px;
+  }
+
   .toneButton {
     width: calc(100% - 44px);
     margin-right: 22px;
-    margin-bottom: 20px;
+    margin-bottom: 16px;
     margin-left: 22px;
   }
 }
