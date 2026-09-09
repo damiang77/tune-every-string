@@ -25,6 +25,7 @@
       },
       "method": {
         "label": "Metoda strojenia",
+        "listen": "Nasłuch",
         "referenceTone": "Dźwięk wzorcowy"
       },
       "mode": {
@@ -46,16 +47,38 @@
       "footer": "Chromatyczny dźwięk wzorcowy · C1–B7"
     },
     "status": {
+      "listenReady": "Rozpocznij strojenie, gdy instrument będzie gotowy.",
+      "starting": "Uruchamianie mikrofonu…",
+      "listening": "Nasłuchiwanie wyraźnego dźwięku.",
+      "noSignal": "Brak sygnału",
+      "acquiring": "Rozpoznawanie",
+      "failed": "Błąd",
       "ready": "Wybierz strunę i posłuchaj jej docelowego dźwięku.",
       "readyChromatic": "Wybierz dźwięk i oktawę, a następnie posłuchaj dźwięku docelowego.",
       "playing": "{{noteName}} gra do momentu zatrzymania.",
-      "error": "Nie udało się uruchomić dźwięku wzorcowego. Sprawdź dźwięk w przeglądarce i spróbuj ponownie."
+      "error": "Nie udało się uruchomić dźwięku wzorcowego. Sprawdź dźwięk w przeglądarce i spróbuj ponownie.",
+      "microphone": {
+        "permission-denied": "Odmówiono dostępu do mikrofonu. Zezwól na dostęp w ustawieniach przeglądarki i spróbuj ponownie albo użyj dźwięku wzorcowego.",
+        "microphone-unavailable": "Mikrofon jest niedostępny. Podłącz go lub włącz i spróbuj ponownie albo użyj dźwięku wzorcowego.",
+        "microphone-unsupported": "Ta przeglądarka nie może tutaj użyć mikrofonu. Użyj obsługiwanej przeglądarki albo dźwięku wzorcowego.",
+        "microphone-unreadable": "Nie udało się uruchomić mikrofonu. Zamknij inne aplikacje, które go używają, i spróbuj ponownie albo użyj dźwięku wzorcowego."
+      }
     },
     "action": {
+      "start": "Rozpocznij strojenie",
+      "stopListening": "Zatrzymaj strojenie",
+      "useReferenceTone": "Użyj dźwięku wzorcowego",
       "play": "Odtwórz {{noteName}}",
       "stop": "Zatrzymaj {{noteName}}"
     },
     "standardGuitar": "Gitara sześciostrunowa · Strój standardowy",
-    "privacy": "Dźwięk będzie przetwarzany na tym urządzeniu. Nic nie zostanie wysłane."
+    "privacy": "Dźwięk jest przetwarzany na tym urządzeniu. Nie jest nagrywany ani wysyłany.",
+    "diagnostics": {
+      "heading": "Diagnostyka deweloperska",
+      "sampleRate": "Częstotliwość próbkowania",
+      "signalLevel": "Poziom sygnału",
+      "frameTiming": "Czas ramki",
+      "deviceSettings": "Zastosowane ustawienia urządzenia"
+    }
   }
 }

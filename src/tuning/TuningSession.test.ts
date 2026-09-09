@@ -2,6 +2,56 @@ import { describe, expect, it } from 'vitest'
 
 import { guitarStandardTuning } from './TuningCatalog'
 import { createTuningSession, type ReferenceToneOutput } from './TuningSession'
+import type {
+  MicrophoneCapture,
+  MicrophoneInput,
+  MicrophoneStartOptions,
+} from './TuningSession'
+
+class ControlledMicrophoneInput implements MicrophoneInput {
+  readonly starts: MicrophoneStartOptions[] = []
+  readonly capture: MicrophoneCapture = {
+    appliedSettings: {
+      autoGainControl: false,
+      channelCount: 1,
+      deviceId: 'built-in',
+      echoCancellation: false,
+      noiseSuppression: false,
+    },
+    sampleRateHz: 48_000,
+  }
+  stopCount = 0
+  private resolveStart: ((capture: MicrophoneCapture) => void) | undefined
+  private rejectStart: ((error: unknown) => void) | undefined
+
+  start(options: MicrophoneStartOptions) {
+    this.starts.push(options)
+    return new Promise<MicrophoneCapture>((resolve, reject) => {
+      this.resolveStart = resolve
+      this.rejectStart = reject
+    })
+  }
+
+  finishStart() {
+    this.resolveStart?.(this.capture)
+  }
+
+  failStart(error: unknown) {
+    this.rejectStart?.(error)
+  }
+
+  stop() {
+    this.stopCount += 1
+    return Promise.resolve()
+  }
+
+  sendFrame(samples: number[], capturedAtMs: number) {
+    this.starts.at(-1)?.onFrame({
+      capturedAtMs,
+      samples: Float32Array.from(samples),
+    })
+  }
+}
 
 class RecordingToneOutput implements ReferenceToneOutput {
   readonly playedFrequencies: number[] = []
@@ -73,6 +123,148 @@ class RetuneFailureOutput implements ReferenceToneOutput {
 }
 
 describe('Tuning Session', () => {
+  it('starts Listen from a player command and reports the actual capture configuration', async () => {
+    const microphoneInput = new ControlledMicrophoneInput()
+    const session = createTuningSession({
+      microphoneInput,
+      referenceToneOutput: new RecordingToneOutput(),
+    })
+
+    const starting = session.dispatch({ type: 'start-listening' })
+
+    expect(session.getSnapshot()).toMatchObject({
+      lifecycleStatus: 'starting',
+      pitchFeedback: 'no-signal',
+      tuningMethod: 'listen',
+    })
+    expect(microphoneInput.starts).toHaveLength(1)
+
+    microphoneInput.finishStart()
+    await starting
+
+    expect(session.getSnapshot()).toMatchObject({
+      diagnostics: {
+        appliedAudioSettings: microphoneInput.capture.appliedSettings,
+        sampleRateHz: 48_000,
+      },
+      lifecycleStatus: 'listening',
+      pitchFeedback: 'no-signal',
+    })
+  })
+
+  it('publishes signal level and frame timing without retaining microphone frames', async () => {
+    const microphoneInput = new ControlledMicrophoneInput()
+    const session = createTuningSession({
+      microphoneInput,
+      referenceToneOutput: new RecordingToneOutput(),
+    })
+    const start = session.dispatch({ type: 'start-listening' })
+    microphoneInput.finishStart()
+    await start
+
+    microphoneInput.sendFrame([0.5, -0.5, 0.5, -0.5], 100)
+    microphoneInput.sendFrame([0.25, -0.25, 0.25, -0.25], 140)
+
+    expect(session.getSnapshot()).toMatchObject({
+      diagnostics: {
+        frameIntervalMs: 40,
+        signalLevel: 0.25,
+      },
+      pitchFeedback: 'acquiring',
+    })
+    expect(session.getSnapshot().diagnostics).not.toHaveProperty('samples')
+
+    microphoneInput.sendFrame([0, 0, 0, 0], 180)
+    expect(session.getSnapshot().pitchFeedback).toBe('no-signal')
+  })
+
+  it('cancels unresolved permission and switches to Reference Tone', async () => {
+    const microphoneInput = new ControlledMicrophoneInput()
+    const session = createTuningSession({
+      microphoneInput,
+      referenceToneOutput: new RecordingToneOutput(),
+    })
+    const start = session.dispatch({ type: 'start-listening' })
+
+    const switchMethod = session.dispatch({
+      type: 'select-tuning-method',
+      tuningMethod: 'reference-tone',
+    })
+    microphoneInput.finishStart()
+    await Promise.all([start, switchMethod])
+
+    expect(microphoneInput.starts[0]?.signal.aborted).toBe(true)
+    expect(microphoneInput.stopCount).toBe(1)
+    expect(session.getSnapshot()).toMatchObject({
+      lifecycleStatus: 'inactive',
+      tuningMethod: 'reference-tone',
+    })
+  })
+
+  it.each([
+    ['permission-denied', 'permission-denied'],
+    ['unavailable', 'microphone-unavailable'],
+    ['unsupported', 'microphone-unsupported'],
+    ['unreadable', 'microphone-unreadable'],
+  ] as const)('reports %s microphone failure distinctly', async (_, reason) => {
+    const microphoneInput = new ControlledMicrophoneInput()
+    const session = createTuningSession({
+      microphoneInput,
+      referenceToneOutput: new RecordingToneOutput(),
+    })
+    const start = session.dispatch({ type: 'start-listening' })
+
+    microphoneInput.failStart({ reason })
+    await start
+
+    expect(session.getSnapshot()).toMatchObject({
+      lifecycleStatus: 'failed',
+      microphoneError: reason,
+      tuningMethod: 'listen',
+    })
+  })
+
+  it('stops Listen and releases microphone capture', async () => {
+    const microphoneInput = new ControlledMicrophoneInput()
+    const session = createTuningSession({
+      microphoneInput,
+      referenceToneOutput: new RecordingToneOutput(),
+    })
+    const start = session.dispatch({ type: 'start-listening' })
+    microphoneInput.finishStart()
+    await start
+
+    await session.dispatch({ type: 'stop' })
+
+    expect(microphoneInput.stopCount).toBe(1)
+    expect(session.getSnapshot()).toMatchObject({
+      lifecycleStatus: 'inactive',
+      pitchFeedback: 'no-signal',
+    })
+  })
+
+  it('stops Listen before playing a Reference Tone', async () => {
+    const microphoneInput = new ControlledMicrophoneInput()
+    const referenceToneOutput = new RecordingToneOutput()
+    const session = createTuningSession({
+      microphoneInput,
+      referenceToneOutput,
+    })
+    const start = session.dispatch({ type: 'start-listening' })
+    microphoneInput.finishStart()
+    await start
+
+    await session.dispatch({ type: 'play-reference-tone' })
+
+    expect(microphoneInput.stopCount).toBe(1)
+    expect(referenceToneOutput.playedFrequencies).toHaveLength(1)
+    expect(session.getSnapshot()).toMatchObject({
+      lifecycleStatus: 'inactive',
+      referenceToneStatus: 'playing',
+      tuningMethod: 'reference-tone',
+    })
+  })
+
   it('exposes Standard Guitar strings in order with pitches derived from A4 = 440 Hz', () => {
     const session = createTuningSession({
       referenceToneOutput: new RecordingToneOutput(),

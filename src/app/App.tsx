@@ -9,6 +9,7 @@ import {
   type TuningSession,
 } from '../tuning/TuningSession'
 import { createWebAudioReferenceTone } from '../tuning/WebAudioReferenceTone'
+import { createWebAudioMicrophoneInput } from '../tuning/WebAudioMicrophoneInput'
 import { createBrowserTuningPreferenceStore } from '../tuning/TuningPreferences'
 import { TunerScreen } from './TunerScreen'
 
@@ -50,6 +51,8 @@ export function App({ session: providedSession }: { session?: TuningSession }) {
     () =>
       providedSession ??
       createTuningSession({
+        initialTuningMethod: 'listen',
+        microphoneInput: createWebAudioMicrophoneInput(),
         preferenceStore: createBrowserTuningPreferenceStore(),
         referenceToneOutput: createWebAudioReferenceTone(),
       }),

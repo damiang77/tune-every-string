@@ -24,6 +24,43 @@ export interface ReferenceToneOutput {
   stop(): Promise<void>
 }
 
+export type MicrophoneError =
+  | 'permission-denied'
+  | 'microphone-unavailable'
+  | 'microphone-unsupported'
+  | 'microphone-unreadable'
+
+export type PitchFeedback = 'no-signal' | 'acquiring'
+export type TuningMethod = 'listen' | 'reference-tone'
+
+export interface AudioDeviceSettings {
+  readonly autoGainControl?: boolean
+  readonly channelCount?: number
+  readonly deviceId?: string
+  readonly echoCancellation?: boolean
+  readonly noiseSuppression?: boolean
+}
+
+export interface MicrophoneFrame {
+  readonly capturedAtMs: number
+  readonly samples: Float32Array
+}
+
+export interface MicrophoneStartOptions {
+  readonly onFrame: (frame: MicrophoneFrame) => void
+  readonly signal: AbortSignal
+}
+
+export interface MicrophoneCapture {
+  readonly appliedSettings: AudioDeviceSettings
+  readonly sampleRateHz: number
+}
+
+export interface MicrophoneInput {
+  start(options: MicrophoneStartOptions): Promise<MicrophoneCapture>
+  stop(): Promise<void>
+}
+
 export interface TuningString extends TargetPitch {
   readonly id: string
 }
@@ -39,11 +76,20 @@ export interface TuningSessionSnapshot {
   readonly chromaticTarget: TargetPitch
   readonly concertPitchHz: number
   readonly instrument: Instrument
+  readonly lifecycleStatus: 'inactive' | 'starting' | 'listening' | 'failed'
+  readonly microphoneError: MicrophoneError | null
+  readonly pitchFeedback: PitchFeedback
+  readonly diagnostics: Readonly<{
+    appliedAudioSettings: AudioDeviceSettings | null
+    frameIntervalMs: number | null
+    sampleRateHz: number | null
+    signalLevel: number
+  }>
   readonly referenceToneError: 'audio-unavailable' | null
   readonly referenceToneStatus: 'stopped' | 'playing'
   readonly selectedString: TuningString
   readonly tuningPreset: TuningPreset
-  readonly tuningMethod: 'reference-tone'
+  readonly tuningMethod: TuningMethod
   readonly tuningMode: 'guided' | 'chromatic'
   readonly strings: readonly TuningString[]
   readonly targetPitch: TargetPitch
@@ -51,6 +97,11 @@ export interface TuningSessionSnapshot {
 
 export type TuningSessionCommand =
   | { readonly type: 'play-reference-tone' }
+  | { readonly type: 'start-listening' }
+  | {
+      readonly type: 'select-tuning-method'
+      readonly tuningMethod: TuningSessionSnapshot['tuningMethod']
+    }
   | {
       readonly type: 'select-chromatic-note'
       readonly pitchClass: ChromaticPitchClass
@@ -78,11 +129,22 @@ export interface TuningSession {
 }
 
 interface CreateTuningSessionOptions {
+  readonly initialTuningMethod?: TuningSessionSnapshot['tuningMethod']
+  readonly microphoneInput?: MicrophoneInput
   readonly referenceToneOutput: ReferenceToneOutput
   readonly concertPitchHz?: number
   readonly instrument?: Instrument
   readonly preferenceStore?: TuningPreferenceStore
   readonly tuningPreset?: TuningPreset
+}
+
+function isMicrophoneError(value: unknown): value is MicrophoneError {
+  return (
+    value === 'permission-denied' ||
+    value === 'microphone-unavailable' ||
+    value === 'microphone-unsupported' ||
+    value === 'microphone-unreadable'
+  )
 }
 
 function assertConcertPitch(concertPitchHz: number) {
@@ -97,7 +159,9 @@ function assertConcertPitch(concertPitchHz: number) {
 
 export function createTuningSession({
   concertPitchHz: initialConcertPitchHz = 440,
+  initialTuningMethod = 'reference-tone',
   instrument: instrumentInput = guitar,
+  microphoneInput,
   preferenceStore,
   referenceToneOutput,
   tuningPreset: tuningPresetInput = guitarStandardTuning,
@@ -180,6 +244,16 @@ export function createTuningSession({
   )
   let referenceToneError: TuningSessionSnapshot['referenceToneError'] = null
   let tuningMode: TuningSessionSnapshot['tuningMode'] = 'guided'
+  let tuningMethod: TuningSessionSnapshot['tuningMethod'] = initialTuningMethod
+  let lifecycleStatus: TuningSessionSnapshot['lifecycleStatus'] = 'inactive'
+  let microphoneError: MicrophoneError | null = null
+  let pitchFeedback: TuningSessionSnapshot['pitchFeedback'] = 'no-signal'
+  let appliedAudioSettings: AudioDeviceSettings | null = null
+  let sampleRateHz: number | null = null
+  let signalLevel = 0
+  let frameIntervalMs: number | null = null
+  let lastFrameAtMs: number | null = null
+  let microphoneAbortController: AbortController | undefined
 
   function getSelectedTarget(): TargetPitch {
     return tuningMode === 'guided' ? selectedString : chromaticTarget
@@ -197,12 +271,21 @@ export function createTuningSession({
       chromaticTarget,
       concertPitchHz,
       instrument,
+      lifecycleStatus,
+      microphoneError,
+      pitchFeedback,
+      diagnostics: Object.freeze({
+        appliedAudioSettings,
+        frameIntervalMs,
+        sampleRateHz,
+        signalLevel,
+      }),
       referenceToneError,
       referenceToneStatus,
       selectedString,
       strings,
       targetPitch: getSelectedTarget(),
-      tuningMethod: 'reference-tone',
+      tuningMethod,
       tuningMode,
       tuningPreset,
     })
@@ -228,6 +311,93 @@ export function createTuningSession({
   }
 
   async function executeCommand(command: TuningSessionCommand) {
+    if (command.type === 'start-listening') {
+      if (lifecycleStatus === 'starting' || lifecycleStatus === 'listening') {
+        return
+      }
+
+      tuningMethod = 'listen'
+      lifecycleStatus = 'starting'
+      microphoneError = null
+      pitchFeedback = 'no-signal'
+      appliedAudioSettings = null
+      sampleRateHz = null
+      signalLevel = 0
+      frameIntervalMs = null
+      lastFrameAtMs = null
+      microphoneAbortController = new AbortController()
+      const controller = microphoneAbortController
+      publishSnapshot()
+
+      if (!microphoneInput) {
+        lifecycleStatus = 'failed'
+        microphoneError = 'microphone-unsupported'
+        publishSnapshot()
+        return
+      }
+
+      try {
+        const capture = await microphoneInput.start({
+          signal: controller.signal,
+          onFrame(frame) {
+            if (controller.signal.aborted || lifecycleStatus !== 'listening') {
+              return
+            }
+
+            let sumOfSquares = 0
+            for (const sample of frame.samples) sumOfSquares += sample * sample
+            signalLevel = frame.samples.length
+              ? Math.sqrt(sumOfSquares / frame.samples.length)
+              : 0
+            frameIntervalMs =
+              lastFrameAtMs === null ? null : frame.capturedAtMs - lastFrameAtMs
+            lastFrameAtMs = frame.capturedAtMs
+            pitchFeedback = signalLevel >= 0.01 ? 'acquiring' : 'no-signal'
+            publishSnapshot()
+          },
+        })
+
+        if (controller.signal.aborted) {
+          await microphoneInput.stop()
+          return
+        }
+
+        appliedAudioSettings = Object.freeze({ ...capture.appliedSettings })
+        sampleRateHz = capture.sampleRateHz
+        lifecycleStatus = 'listening'
+      } catch (error) {
+        if (controller.signal.aborted) return
+        const reason =
+          typeof error === 'object' && error && 'reason' in error
+            ? error.reason
+            : undefined
+        microphoneError = isMicrophoneError(reason)
+          ? reason
+          : 'microphone-unreadable'
+        lifecycleStatus = 'failed'
+      }
+      publishSnapshot()
+      return
+    }
+
+    if (command.type === 'select-tuning-method') {
+      if (command.tuningMethod === tuningMethod) return
+
+      if (command.tuningMethod === 'reference-tone') {
+        microphoneAbortController?.abort()
+        if (lifecycleStatus === 'listening') await microphoneInput?.stop()
+        lifecycleStatus = 'inactive'
+        microphoneError = null
+        pitchFeedback = 'no-signal'
+      } else if (referenceToneStatus === 'playing') {
+        await referenceToneOutput.stop()
+        referenceToneStatus = 'stopped'
+      }
+      tuningMethod = command.tuningMethod
+      publishSnapshot()
+      return
+    }
+
     if (command.type === 'set-accidental-preference') {
       if (command.accidentalPreference === accidentalPreference) return
 
@@ -334,6 +504,15 @@ export function createTuningSession({
     if (command.type === 'play-reference-tone') {
       if (referenceToneStatus === 'playing') return
 
+      if (lifecycleStatus === 'listening') {
+        microphoneAbortController?.abort()
+        await microphoneInput?.stop()
+        lifecycleStatus = 'inactive'
+        pitchFeedback = 'no-signal'
+      }
+      tuningMethod = 'reference-tone'
+      microphoneError = null
+
       try {
         await referenceToneOutput.play(getSelectedTarget().frequencyHz)
         referenceToneError = null
@@ -342,6 +521,15 @@ export function createTuningSession({
         referenceToneError = 'audio-unavailable'
         referenceToneStatus = 'stopped'
       }
+      publishSnapshot()
+      return
+    }
+
+    if (lifecycleStatus === 'starting' || lifecycleStatus === 'listening') {
+      microphoneAbortController?.abort()
+      await microphoneInput?.stop()
+      lifecycleStatus = 'inactive'
+      pitchFeedback = 'no-signal'
       publishSnapshot()
       return
     }
@@ -359,6 +547,12 @@ export function createTuningSession({
   }
 
   function dispatch(command: TuningSessionCommand) {
+    if (
+      command.type === 'select-tuning-method' &&
+      command.tuningMethod === 'reference-tone'
+    ) {
+      microphoneAbortController?.abort()
+    }
     const previousCommand = pendingCommand
     const result = previousCommand
       ? previousCommand

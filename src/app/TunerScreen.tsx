@@ -8,7 +8,7 @@ import type {
   ChromaticOctave,
   ChromaticPitchClass,
 } from '../tuning/ChromaticPitch'
-import type { TuningSession } from '../tuning/TuningSession'
+import type { TuningMethod, TuningSession } from '../tuning/TuningSession'
 import styles from './TunerScreen.module.css'
 
 const meterTicks = Array.from({ length: 21 }, (_, index) => index)
@@ -33,6 +33,11 @@ export function TunerScreen({
   const { t } = useTranslation()
   const snapshot = useSyncExternalStore(session.subscribe, session.getSnapshot)
   const isPlaying = snapshot.referenceToneStatus === 'playing'
+  const isListen = snapshot.tuningMethod === 'listen'
+  const methodLabel = (tuningMethod: TuningMethod) =>
+    tuningMethod === 'listen'
+      ? t('tuner.selection.method.listen')
+      : t('tuner.selection.method.referenceTone')
   function selectString(stringId: string) {
     void session.dispatch({ type: 'select-string', stringId })
   }
@@ -45,6 +50,17 @@ export function TunerScreen({
 
   function selectTuningMode(tuningMode: 'guided' | 'chromatic') {
     void session.dispatch({ type: 'select-tuning-mode', tuningMode })
+  }
+
+  function selectTuningMethod(tuningMethod: TuningMethod) {
+    void session.dispatch({ type: 'select-tuning-method', tuningMethod })
+  }
+
+  function toggleListen() {
+    void session.dispatch({
+      type:
+        snapshot.lifecycleStatus === 'listening' ? 'stop' : 'start-listening',
+    })
   }
 
   function setConcertPitch(concertPitchHz: number) {
@@ -103,7 +119,7 @@ export function TunerScreen({
           <div className={styles.cardHeader}>
             <div>
               <p className={styles.modeLabel}>
-                {t('tuner.selection.method.referenceTone')}
+                {methodLabel(snapshot.tuningMethod)}
               </p>
               <h2 id="tuner-heading">{t('tuner.heading')}</h2>
             </div>
@@ -151,13 +167,31 @@ export function TunerScreen({
             </div>
             <div>
               <dt>{t('tuner.selection.method.label')}</dt>
-              <dd>{t('tuner.selection.method.referenceTone')}</dd>
+              <dd>{methodLabel(snapshot.tuningMethod)}</dd>
             </div>
             <div>
               <dt>{t('tuner.selection.mode.label')}</dt>
               <dd>{t(`tuner.selection.mode.${snapshot.tuningMode}`)}</dd>
             </div>
           </dl>
+
+          <div
+            aria-label={t('tuner.selection.method.label')}
+            className={styles.modeSwitch}
+            role="group"
+          >
+            {(['listen', 'reference-tone'] as const).map((tuningMethod) => (
+              <button
+                aria-pressed={snapshot.tuningMethod === tuningMethod}
+                className={styles.modeButton}
+                key={tuningMethod}
+                onClick={() => selectTuningMethod(tuningMethod)}
+                type="button"
+              >
+                {methodLabel(tuningMethod)}
+              </button>
+            ))}
+          </div>
 
           <div
             aria-label={t('tuner.selection.mode.label')}
@@ -268,23 +302,45 @@ export function TunerScreen({
           <div
             aria-atomic="true"
             className={styles.status}
-            role={snapshot.referenceToneError ? 'alert' : 'status'}
+            role={
+              snapshot.referenceToneError || snapshot.microphoneError
+                ? 'alert'
+                : 'status'
+            }
           >
             <p
-              className={`${styles.waiting} ${snapshot.referenceToneError ? styles.error : ''}`}
+              className={`${styles.waiting} ${snapshot.referenceToneError || snapshot.microphoneError ? styles.error : ''}`}
             >
-              {snapshot.referenceToneError
-                ? t('tuner.status.error')
-                : isPlaying
-                  ? t('tuner.status.playing', {
-                      noteName: snapshot.targetPitch.noteName,
-                    })
-                  : snapshot.tuningMode === 'guided'
-                    ? t('tuner.status.ready')
-                    : t('tuner.status.readyChromatic')}
+              {snapshot.microphoneError
+                ? t(`tuner.status.microphone.${snapshot.microphoneError}`)
+                : isListen && snapshot.lifecycleStatus === 'starting'
+                  ? t('tuner.status.starting')
+                  : isListen && snapshot.lifecycleStatus === 'listening'
+                    ? t('tuner.status.listening')
+                    : isListen
+                      ? t('tuner.status.listenReady')
+                      : snapshot.referenceToneError
+                        ? t('tuner.status.error')
+                        : isPlaying
+                          ? t('tuner.status.playing', {
+                              noteName: snapshot.targetPitch.noteName,
+                            })
+                          : snapshot.tuningMode === 'guided'
+                            ? t('tuner.status.ready')
+                            : t('tuner.status.readyChromatic')}
             </p>
             <p className={styles.instruction}>
-              {snapshot.targetPitch.frequencyHz.toFixed(2)} Hz
+              {snapshot.microphoneError
+                ? t('tuner.status.failed')
+                : isListen && snapshot.lifecycleStatus === 'listening'
+                  ? t(
+                      snapshot.pitchFeedback === 'acquiring'
+                        ? 'tuner.status.acquiring'
+                        : 'tuner.status.noSignal',
+                    )
+                  : isListen
+                    ? null
+                    : `${snapshot.targetPitch.frequencyHz.toFixed(2)} Hz`}
             </p>
           </div>
 
@@ -313,22 +369,73 @@ export function TunerScreen({
             </p>
           )}
 
-          <button
-            className={styles.toneButton}
-            onClick={toggleReferenceTone}
-            type="button"
-          >
-            <span className={styles.toneButtonIcon} aria-hidden="true">
-              {isPlaying ? '■' : '▶'}
-            </span>
-            {isPlaying
-              ? t('tuner.action.stop', {
-                  noteName: snapshot.targetPitch.noteName,
-                })
-              : t('tuner.action.play', {
-                  noteName: snapshot.targetPitch.noteName,
-                })}
-          </button>
+          {isListen ? (
+            <>
+              <p className={styles.capturePrivacy}>{t('tuner.privacy')}</p>
+              <button
+                className={styles.toneButton}
+                disabled={snapshot.lifecycleStatus === 'starting'}
+                onClick={toggleListen}
+                type="button"
+              >
+                {snapshot.lifecycleStatus === 'listening'
+                  ? t('tuner.action.stopListening')
+                  : t('tuner.action.start')}
+              </button>
+              {snapshot.lifecycleStatus === 'starting' ? (
+                <button
+                  className={styles.secondaryAction}
+                  onClick={() => selectTuningMethod('reference-tone')}
+                  type="button"
+                >
+                  {t('tuner.action.useReferenceTone')}
+                </button>
+              ) : null}
+            </>
+          ) : (
+            <button
+              className={styles.toneButton}
+              onClick={toggleReferenceTone}
+              type="button"
+            >
+              <span className={styles.toneButtonIcon} aria-hidden="true">
+                {isPlaying ? '■' : '▶'}
+              </span>
+              {isPlaying
+                ? t('tuner.action.stop', {
+                    noteName: snapshot.targetPitch.noteName,
+                  })
+                : t('tuner.action.play', {
+                    noteName: snapshot.targetPitch.noteName,
+                  })}
+            </button>
+          )}
+
+          {import.meta.env.DEV && snapshot.diagnostics.sampleRateHz ? (
+            <details className={styles.diagnostics}>
+              <summary>{t('tuner.diagnostics.heading')}</summary>
+              <dl>
+                <div>
+                  <dt>{t('tuner.diagnostics.sampleRate')}</dt>
+                  <dd>{snapshot.diagnostics.sampleRateHz} Hz</dd>
+                </div>
+                <div>
+                  <dt>{t('tuner.diagnostics.signalLevel')}</dt>
+                  <dd>{snapshot.diagnostics.signalLevel.toFixed(4)}</dd>
+                </div>
+                <div>
+                  <dt>{t('tuner.diagnostics.frameTiming')}</dt>
+                  <dd>{snapshot.diagnostics.frameIntervalMs ?? '—'} ms</dd>
+                </div>
+                <div>
+                  <dt>{t('tuner.diagnostics.deviceSettings')}</dt>
+                  <dd>
+                    {JSON.stringify(snapshot.diagnostics.appliedAudioSettings)}
+                  </dd>
+                </div>
+              </dl>
+            </details>
+          ) : null}
 
           <div className={styles.cardFooter}>
             <span className={styles.statusDot} />

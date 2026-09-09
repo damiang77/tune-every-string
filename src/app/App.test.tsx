@@ -52,6 +52,12 @@ describe('application routes', () => {
       screen.getByRole('heading', { name: 'Tune Every String' }),
     ).toBeVisible()
     expect(screen.getByRole('heading', { name: 'Tuner' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Start tuning' })).toBeVisible()
+    expect(
+      screen.getAllByText(
+        'Audio is processed on this device. It is not recorded or uploaded.',
+      )[0],
+    ).toBeVisible()
     expect(document.documentElement).toHaveAttribute('lang', 'en')
   })
 

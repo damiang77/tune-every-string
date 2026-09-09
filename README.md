@@ -2,7 +2,7 @@
 
 Tune Every String is a browser tuner for guitar and bass. It will start in an approachable guided mode, with chromatic tuning available when a preset is not enough. More string instruments can be added without changing the product foundation.
 
-The current implementation includes the bilingual application shell, guided Reference Tones for six-string Guitar Standard tuning, and calibrated Chromatic Reference Tones from C1 through B7. The microphone and pitch-detection flow will arrive in later milestones.
+The current implementation includes the bilingual application shell, guided Reference Tones for six-string Guitar Standard tuning, calibrated Chromatic Reference Tones from C1 through B7, and local microphone capture with live signal feedback. Pitch estimation will arrive in a later milestone.
 
 ## Product principles
 
