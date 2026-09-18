@@ -220,6 +220,84 @@ describe('Tuning Session', () => {
     },
   )
 
+  it('detects Chromatic notes beyond the selected Instrument range', async () => {
+    const microphoneInput = new ControlledMicrophoneInput()
+    const session = createTuningSession({
+      initialTuningMethod: 'listen',
+      microphoneInput,
+      pitchEstimator: createMcleodPitchEstimator(),
+      referenceToneOutput: new RecordingToneOutput(),
+    })
+    await session.dispatch({
+      type: 'select-tuning-mode',
+      tuningMode: 'chromatic',
+    })
+    const start = session.dispatch({ type: 'start-listening' })
+    microphoneInput.finishStart()
+    await start
+
+    microphoneInput.sendFrame(createSineFrame(440), 0)
+    await flushPitchEstimation()
+
+    expect(session.getSnapshot()).toMatchObject({
+      detectedPitch: { frequencyHz: expect.closeTo(440, 1) },
+      targetPitch: { noteName: 'A4' },
+    })
+  })
+
+  it('uses Concert Pitch and Accidental Preference for Chromatic Listen feedback', async () => {
+    const microphoneInput = new ControlledMicrophoneInput()
+    const pitchEstimator = new DeferredPitchEstimator()
+    const session = createTuningSession({
+      concertPitchHz: 442,
+      initialTuningMethod: 'listen',
+      microphoneInput,
+      pitchEstimator,
+      referenceToneOutput: new RecordingToneOutput(),
+    })
+    await session.dispatch({
+      type: 'set-accidental-preference',
+      accidentalPreference: 'flats',
+    })
+    await session.dispatch({
+      type: 'select-tuning-mode',
+      tuningMode: 'chromatic',
+    })
+    const start = session.dispatch({ type: 'start-listening' })
+    microphoneInput.finishStart()
+    await start
+
+    for (const capturedAtMs of [0, 40, 80]) {
+      microphoneInput.sendFrame([0.5, -0.5], capturedAtMs)
+      pitchEstimator.resolve({
+        clarity: 0.99,
+        frequencyHz: 442,
+        signalLevel: 0.5,
+      })
+      await flushPitchEstimation()
+    }
+
+    expect(session.getSnapshot()).toMatchObject({
+      chromaticTarget: { frequencyHz: 442, noteName: 'A4' },
+      detectedPitch: { centsDeviation: expect.closeTo(0, 5) },
+      pitchFeedback: 'in-tune',
+    })
+
+    microphoneInput.sendFrame([0.5, -0.5], 120)
+    pitchEstimator.resolve({
+      clarity: 0.99,
+      frequencyHz: 470,
+      signalLevel: 0.5,
+    })
+    await flushPitchEstimation()
+
+    expect(session.getSnapshot()).toMatchObject({
+      chromaticTarget: { noteName: 'B♭4' },
+      detectedPitch: { centsDeviation: expect.closeTo(6.34, 1) },
+      pitchFeedback: 'too-high',
+    })
+  })
+
   it.each([430, 440, 450])(
     'derives every Bass Target Pitch at A4 = %i Hz',
     (concertPitchHz) => {
@@ -610,6 +688,39 @@ describe('Tuning Session', () => {
     })
   })
 
+  it('restarts active Listen with a Chromatic capture window when switching mode', async () => {
+    const microphoneInput = new ControlledMicrophoneInput()
+    const session = createTuningSession({
+      initialTuningMethod: 'listen',
+      microphoneInput,
+      referenceToneOutput: new RecordingToneOutput(),
+    })
+    const startGuided = session.dispatch({ type: 'start-listening' })
+    microphoneInput.finishStart()
+    await startGuided
+
+    const switchMode = session.dispatch({
+      type: 'select-tuning-mode',
+      tuningMode: 'chromatic',
+    })
+    await flushPitchEstimation()
+    microphoneInput.finishStart()
+    await switchMode
+
+    expect(microphoneInput.stopCount).toBe(1)
+    expect(microphoneInput.starts).toHaveLength(2)
+    expect(
+      microphoneInput.starts[1]?.minimumAnalysisWindowSeconds,
+    ).toBeGreaterThan(
+      microphoneInput.starts[0]?.minimumAnalysisWindowSeconds ?? 0,
+    )
+    expect(session.getSnapshot()).toMatchObject({
+      lifecycleStatus: 'listening',
+      tuningMethod: 'listen',
+      tuningMode: 'chromatic',
+    })
+  })
+
   it('restores the last Guitar Tuning Preset and Tuning Mode from preferences', async () => {
     let savedPresetId: string | undefined
     let savedTuningMode: 'guided' | 'chromatic' | undefined
@@ -738,6 +849,45 @@ describe('Tuning Session', () => {
       tuningMode: 'guided',
     })
   })
+
+  it.each([
+    ['immediately below a semitone boundary', 452.892983, 'A4', 69],
+    ['at a semitone boundary', 452.8929841231365, 'A♯4', 70],
+    ['immediately above a semitone boundary', 452.892985, 'A♯4', 70],
+    ['immediately below an octave boundary', 508.355185, 'B4', 71],
+    ['at an octave boundary', 508.35518662380014, 'C5', 72],
+    ['immediately above an octave boundary', 508.355188, 'C5', 72],
+  ])(
+    'maps a confident Chromatic Detected Pitch %s to its nearest note',
+    async (_, frequencyHz, noteName, midiNoteNumber) => {
+      const microphoneInput = new ControlledMicrophoneInput()
+      const pitchEstimator = new DeferredPitchEstimator()
+      const session = createTuningSession({
+        initialTuningMethod: 'listen',
+        microphoneInput,
+        pitchEstimator,
+        referenceToneOutput: new RecordingToneOutput(),
+      })
+      await session.dispatch({
+        type: 'select-tuning-mode',
+        tuningMode: 'chromatic',
+      })
+      const start = session.dispatch({ type: 'start-listening' })
+      microphoneInput.finishStart()
+      await start
+
+      microphoneInput.sendFrame([0.5, -0.5], 0)
+      pitchEstimator.resolve({ clarity: 0.99, frequencyHz, signalLevel: 0.5 })
+      await flushPitchEstimation()
+
+      expect(session.getSnapshot()).toMatchObject({
+        chromaticTarget: { midiNoteNumber, noteName },
+        detectedPitch: { frequencyHz: expect.closeTo(frequencyHz, 5) },
+        targetPitch: { midiNoteNumber, noteName },
+        tuningMode: 'chromatic',
+      })
+    },
+  )
 
   it('does not let smoothing turn an out-of-tune reading into a stable result', async () => {
     const microphoneInput = new ControlledMicrophoneInput()
@@ -1037,6 +1187,33 @@ describe('Tuning Session', () => {
       lifecycleStatus: 'inactive',
       referenceToneStatus: 'playing',
       tuningMethod: 'reference-tone',
+    })
+  })
+
+  it('stops a Reference Tone before Chromatic Listen starts after a mode change', async () => {
+    const microphoneInput = new ControlledMicrophoneInput()
+    const referenceToneOutput = new RecordingToneOutput()
+    const session = createTuningSession({
+      microphoneInput,
+      referenceToneOutput,
+    })
+    await session.dispatch({ type: 'play-reference-tone' })
+    await session.dispatch({
+      type: 'select-tuning-mode',
+      tuningMode: 'chromatic',
+    })
+
+    const start = session.dispatch({ type: 'start-listening' })
+    await Promise.resolve()
+    microphoneInput.finishStart()
+    await start
+
+    expect(referenceToneOutput.stopCount).toBe(1)
+    expect(session.getSnapshot()).toMatchObject({
+      lifecycleStatus: 'listening',
+      referenceToneStatus: 'stopped',
+      tuningMethod: 'listen',
+      tuningMode: 'chromatic',
     })
   })
 

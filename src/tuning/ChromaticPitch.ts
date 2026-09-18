@@ -79,3 +79,38 @@ export function createChromaticTarget(
     concertPitchHz,
   )
 }
+
+export function selectNearestChromaticTarget(
+  frequencyHz: number,
+  accidentalPreference: AccidentalPreference,
+  concertPitchHz: number,
+) {
+  const midiNoteNumber = Math.max(
+    24,
+    Math.min(
+      107,
+      Math.round(69 + 12 * Math.log2(frequencyHz / concertPitchHz)),
+    ),
+  )
+  const pitchClass = (midiNoteNumber % 12) as ChromaticPitchClass
+  const octave = (Math.floor(midiNoteNumber / 12) - 1) as ChromaticOctave
+
+  return Object.freeze({
+    octave,
+    pitchClass,
+    targetPitch: createChromaticTarget(
+      pitchClass,
+      octave,
+      accidentalPreference,
+      concertPitchHz,
+    ),
+  })
+}
+
+export function createChromaticAnalysisRange(concertPitchHz: number) {
+  return Object.freeze({
+    maximumFrequencyHz: createTargetPitch(107, 'B7', concertPitchHz)
+      .frequencyHz,
+    minimumFrequencyHz: createTargetPitch(24, 'C1', concertPitchHz).frequencyHz,
+  })
+}

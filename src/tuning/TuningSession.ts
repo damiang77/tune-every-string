@@ -11,9 +11,11 @@ import {
 } from './TuningCatalog'
 import {
   chromaticOctaveOptions,
+  createChromaticAnalysisRange,
   createChromaticNoteOptions,
   createChromaticTarget,
   isChromaticOctave,
+  selectNearestChromaticTarget,
   type ChromaticNoteOption,
   type ChromaticOctave,
   type ChromaticPitchClass,
@@ -339,6 +341,17 @@ export function createTuningSession({
     return tuningMode === 'guided' ? selectedString : chromaticTarget
   }
 
+  function getPitchAnalysisRequirements(): PitchAnalysisRequirements {
+    if (tuningMode === 'chromatic') {
+      return {
+        ...createChromaticAnalysisRange(concertPitchHz),
+        minimumPeriods: 3,
+      }
+    }
+
+    return instrument.pitchAnalysis ?? defaultPitchAnalysis
+  }
+
   function findClosestString(frequencyHz: number) {
     let closestString = selectedString
     let smallestDistanceInCents = Number.POSITIVE_INFINITY
@@ -450,6 +463,12 @@ export function createTuningSession({
     }
   }
 
+  async function stopListeningCapture() {
+    microphoneAbortController?.abort()
+    await microphoneInput?.stop()
+    lifecycleStatus = 'inactive'
+  }
+
   async function executeCommand(command: TuningSessionCommand) {
     if (command.type === 'start-listening') {
       if (lifecycleStatus === 'starting' || lifecycleStatus === 'listening') {
@@ -467,7 +486,23 @@ export function createTuningSession({
       lastFrameAtMs = null
       microphoneAbortController = new AbortController()
       const controller = microphoneAbortController
+      const stoppingReferenceTone =
+        referenceToneStatus === 'playing'
+          ? referenceToneOutput.stop()
+          : undefined
+      referenceToneStatus = 'stopped'
       publishSnapshot()
+
+      if (stoppingReferenceTone) {
+        try {
+          await stoppingReferenceTone
+        } catch {
+          referenceToneError = 'audio-unavailable'
+          lifecycleStatus = 'inactive'
+          publishSnapshot()
+          return
+        }
+      }
 
       if (!microphoneInput) {
         lifecycleStatus = 'failed'
@@ -477,10 +512,11 @@ export function createTuningSession({
       }
 
       try {
+        const initialPitchAnalysis = getPitchAnalysisRequirements()
         const capture = await microphoneInput.start({
           minimumAnalysisWindowSeconds:
-            (instrument.pitchAnalysis?.minimumPeriods ?? 3) /
-            (instrument.pitchAnalysis?.minimumFrequencyHz ?? 30),
+            initialPitchAnalysis.minimumPeriods /
+            initialPitchAnalysis.minimumFrequencyHz,
           signal: controller.signal,
           onFrame(frame) {
             if (controller.signal.aborted || lifecycleStatus !== 'listening') {
@@ -504,12 +540,11 @@ export function createTuningSession({
             estimationInFlight = true
             const estimatedTuningMode = tuningMode
             const estimatedTargetFrequencyHz = getSelectedTarget().frequencyHz
+            const pitchAnalysis = getPitchAnalysisRequirements()
             void pitchEstimator
               .estimate(frame.samples, sampleRateHz ?? captureSampleRateHz, {
-                maximumFrequencyHz:
-                  instrument.pitchAnalysis?.maximumFrequencyHz ?? 420,
-                minimumFrequencyHz:
-                  instrument.pitchAnalysis?.minimumFrequencyHz ?? 30,
+                maximumFrequencyHz: pitchAnalysis.maximumFrequencyHz,
+                minimumFrequencyHz: pitchAnalysis.minimumFrequencyHz,
               })
               .then((estimation) => {
                 if (
@@ -527,6 +562,24 @@ export function createTuningSession({
                     estimation.frequencyHz,
                     estimation.clarity,
                   )
+                } else if (
+                  estimation.frequencyHz !== null &&
+                  estimation.clarity !== null
+                ) {
+                  const selection = selectNearestChromaticTarget(
+                    estimation.frequencyHz,
+                    accidentalPreference,
+                    concertPitchHz,
+                  )
+                  if (
+                    selection.targetPitch.midiNoteNumber !==
+                    chromaticTarget.midiNoteNumber
+                  ) {
+                    pitchFeedbackTracker.reset()
+                  }
+                  chromaticTarget = selection.targetPitch
+                  chromaticPitchClass = selection.pitchClass
+                  chromaticOctave = selection.octave
                 }
 
                 const trackingResult = pitchFeedbackTracker.update(
@@ -583,8 +636,11 @@ export function createTuningSession({
 
       if (command.tuningMethod === 'reference-tone') {
         microphoneAbortController?.abort()
-        if (lifecycleStatus === 'listening') await microphoneInput?.stop()
-        lifecycleStatus = 'inactive'
+        if (lifecycleStatus === 'listening') {
+          await stopListeningCapture()
+        } else {
+          lifecycleStatus = 'inactive'
+        }
         microphoneError = null
         resetPitchTracking('no-signal')
       } else if (referenceToneStatus === 'playing') {
@@ -707,12 +763,20 @@ export function createTuningSession({
     if (command.type === 'select-tuning-mode') {
       if (command.tuningMode === tuningMode) return
 
+      const restartListen = lifecycleStatus === 'listening'
+      if (restartListen) {
+        await stopListeningCapture()
+      }
       tuningMode = command.tuningMode
       preferenceStore?.saveTuningMode?.(tuningMode)
-      resetPitchTracking(
-        lifecycleStatus === 'listening' ? 'acquiring' : 'no-signal',
-      )
+      resetPitchTracking(restartListen ? 'acquiring' : 'no-signal')
       referenceToneError = null
+
+      if (restartListen) {
+        await executeCommand({ type: 'start-listening' })
+        return
+      }
+
       await retunePlayingReferenceTone(getSelectedTarget())
       publishSnapshot()
       return
@@ -782,9 +846,7 @@ export function createTuningSession({
       if (referenceToneStatus === 'playing') return
 
       if (lifecycleStatus === 'listening') {
-        microphoneAbortController?.abort()
-        await microphoneInput?.stop()
-        lifecycleStatus = 'inactive'
+        await stopListeningCapture()
         resetPitchTracking('no-signal')
       }
       tuningMethod = 'reference-tone'
