@@ -42,6 +42,10 @@
       },
       "string": {
         "label": "String"
+      },
+      "audioInput": {
+        "label": "Audio input",
+        "browserDefault": "Browser default"
       }
     },
     "chromatic": {
@@ -73,10 +77,19 @@
         "microphone-unavailable": "No microphone is available. Connect or enable one, then try again, or use Reference Tone.",
         "microphone-unsupported": "This browser cannot use the microphone here. Try a supported browser or use Reference Tone.",
         "microphone-unreadable": "The microphone could not start. Close other apps using it, then try again, or use Reference Tone."
+      },
+      "interruption": {
+        "muted": "The microphone was muted. Unmute it, then resume tuning.",
+        "ended": "The microphone disconnected. Check it, then resume tuning.",
+        "page-hidden": "Tuning paused while this page was hidden. Resume when you are ready.",
+        "audio-suspended": "The browser paused audio. Resume tuning to continue.",
+        "audio-failed": "Browser audio stopped. Check your audio device, then resume tuning.",
+        "inactive": "The microphone stopped after five minutes without a usable signal. Resume to try again."
       }
     },
     "action": {
       "start": "Start tuning",
+      "resume": "Resume tuning",
       "stopListening": "Stop tuning",
       "useReferenceTone": "Use Reference Tone",
       "play": "Play {{noteName}}",

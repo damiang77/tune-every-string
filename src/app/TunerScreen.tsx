@@ -35,6 +35,7 @@ export function TunerScreen({
   const isPlaying = snapshot.referenceToneStatus === 'playing'
   const isListen = snapshot.tuningMethod === 'listen'
   const isListening = snapshot.lifecycleStatus === 'listening'
+  const isInterrupted = snapshot.lifecycleStatus === 'interrupted'
   const detectedCents = snapshot.detectedPitch?.centsDeviation ?? 0
   const boundedCents = Math.max(-50, Math.min(50, detectedCents))
   const meterStyle = {
@@ -73,29 +74,52 @@ export function TunerScreen({
     return t('tuner.status.inTune')
   }
 
+  const interruptionMessage = () => {
+    switch (snapshot.interruptionReason) {
+      case 'muted':
+        return t('tuner.status.interruption.muted')
+      case 'ended':
+        return t('tuner.status.interruption.ended')
+      case 'page-hidden':
+        return t('tuner.status.interruption.page-hidden')
+      case 'audio-suspended':
+        return t('tuner.status.interruption.audio-suspended')
+      case 'audio-failed':
+        return t('tuner.status.interruption.audio-failed')
+      case 'inactive':
+        return t('tuner.status.interruption.inactive')
+      default:
+        return t('tuner.status.listenReady')
+    }
+  }
+
   const statusMessage = snapshot.microphoneError
     ? t(`tuner.status.microphone.${snapshot.microphoneError}`)
-    : isListen && snapshot.lifecycleStatus === 'starting'
-      ? t('tuner.status.starting')
-      : isListening
-        ? snapshot.detectedPitch
-          ? t('tuner.status.detectedPitch', {
-              cents: Math.abs(snapshot.detectedPitch.centsDeviation).toFixed(1),
-              frequency: snapshot.detectedPitch.frequencyHz.toFixed(2),
-              result: pitchFeedbackLabel(),
-            })
-          : t('tuner.status.listening')
-        : snapshot.referenceToneError
-          ? t('tuner.status.error')
-          : isPlaying
-            ? t('tuner.status.playing', {
-                noteName: snapshot.targetPitch.noteName,
+    : isListen && isInterrupted
+      ? interruptionMessage()
+      : isListen && snapshot.lifecycleStatus === 'starting'
+        ? t('tuner.status.starting')
+        : isListening
+          ? snapshot.detectedPitch
+            ? t('tuner.status.detectedPitch', {
+                cents: Math.abs(snapshot.detectedPitch.centsDeviation).toFixed(
+                  1,
+                ),
+                frequency: snapshot.detectedPitch.frequencyHz.toFixed(2),
+                result: pitchFeedbackLabel(),
               })
-            : isListen
-              ? t('tuner.status.listenReady')
-              : snapshot.tuningMode === 'guided'
-                ? t('tuner.status.ready')
-                : t('tuner.status.readyChromatic')
+            : t('tuner.status.listening')
+          : snapshot.referenceToneError
+            ? t('tuner.status.error')
+            : isPlaying
+              ? t('tuner.status.playing', {
+                  noteName: snapshot.targetPitch.noteName,
+                })
+              : isListen
+                ? t('tuner.status.listenReady')
+                : snapshot.tuningMode === 'guided'
+                  ? t('tuner.status.ready')
+                  : t('tuner.status.readyChromatic')
 
   const displayedFrequency = snapshot.detectedPitch?.frequencyHz
     ? `${snapshot.detectedPitch.frequencyHz.toFixed(2)} Hz`
@@ -112,7 +136,11 @@ export function TunerScreen({
   function togglePrimaryAction() {
     if (isListen) {
       void session.dispatch({
-        type: isListening ? 'stop' : 'start-listening',
+        type: isListening
+          ? 'stop'
+          : isInterrupted
+            ? 'resume-listening'
+            : 'start-listening',
       })
       return
     }
@@ -135,7 +163,9 @@ export function TunerScreen({
   const primaryActionLabel = isListen
     ? isListening
       ? t('tuner.action.stopListening')
-      : t('tuner.action.start')
+      : isInterrupted
+        ? t('tuner.action.resume')
+        : t('tuner.action.start')
     : isPlaying
       ? t('tuner.action.stop', { noteName: snapshot.targetPitch.noteName })
       : t('tuner.action.play', { noteName: snapshot.targetPitch.noteName })
@@ -371,6 +401,33 @@ export function TunerScreen({
                 </select>
               </label>
             </div>
+
+            {isListen && snapshot.audioInputs.length > 0 ? (
+              <div className={styles.settingGroup}>
+                <label className={styles.presetSetting}>
+                  <span>{t('tuner.selection.audioInput.label')}</span>
+                  <select
+                    aria-label={t('tuner.selection.audioInput.label')}
+                    onChange={(event) =>
+                      void session.dispatch({
+                        type: 'select-audio-input',
+                        deviceId: event.currentTarget.value,
+                      })
+                    }
+                    value={snapshot.selectedAudioInputId ?? ''}
+                  >
+                    <option value="">
+                      {t('tuner.selection.audioInput.browserDefault')}
+                    </option>
+                    {snapshot.audioInputs.map((device) => (
+                      <option key={device.deviceId} value={device.deviceId}>
+                        {device.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            ) : null}
 
             <div className={styles.settingGroup}>
               <label className={styles.presetSetting}>

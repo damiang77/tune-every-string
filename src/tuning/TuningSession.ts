@@ -60,14 +60,25 @@ export interface MicrophoneFrame {
   readonly samples: Float32Array
 }
 
+export interface AudioInputDevice {
+  readonly deviceId: string
+  readonly label: string
+}
+
+export type MicrophoneInterruption =
+  'muted' | 'ended' | 'page-hidden' | 'audio-suspended' | 'audio-failed'
+
 export interface MicrophoneStartOptions {
+  readonly deviceId?: string
   readonly minimumAnalysisWindowSeconds: number
   readonly onFrame: (frame: MicrophoneFrame) => void
+  readonly onInterruption: (reason: MicrophoneInterruption) => void
   readonly signal: AbortSignal
 }
 
 export interface MicrophoneCapture {
   readonly appliedSettings: AudioDeviceSettings
+  readonly availableAudioInputs: readonly AudioInputDevice[]
   readonly sampleRateHz: number
 }
 
@@ -81,6 +92,7 @@ export interface TuningString extends TargetPitch {
 }
 
 export interface TuningSessionSnapshot {
+  readonly audioInputs: readonly AudioInputDevice[]
   readonly accidentalPreference: AccidentalPreference
   readonly chromaticNoteOptions: readonly ChromaticNoteOption[]
   readonly chromaticOctaveOptions: readonly ChromaticOctave[]
@@ -92,7 +104,9 @@ export interface TuningSessionSnapshot {
   readonly concertPitchHz: number
   readonly instrument: Instrument
   readonly instruments: readonly Instrument[]
-  readonly lifecycleStatus: 'inactive' | 'starting' | 'listening' | 'failed'
+  readonly lifecycleStatus:
+    'inactive' | 'starting' | 'listening' | 'interrupted' | 'failed'
+  readonly interruptionReason: MicrophoneInterruption | 'inactive' | null
   readonly microphoneError: MicrophoneError | null
   readonly pitchFeedback: PitchFeedback
   readonly diagnostics: Readonly<{
@@ -105,6 +119,7 @@ export interface TuningSessionSnapshot {
   readonly referenceToneError: 'audio-unavailable' | null
   readonly referenceToneStatus: 'stopped' | 'playing'
   readonly selectedString: TuningString
+  readonly selectedAudioInputId: string | null
   readonly stringLock: boolean
   readonly tuningPresets: readonly TuningPreset[]
   readonly tuningPreset: TuningPreset
@@ -117,6 +132,8 @@ export interface TuningSessionSnapshot {
 export type TuningSessionCommand =
   | { readonly type: 'play-reference-tone' }
   | { readonly type: 'start-listening' }
+  | { readonly type: 'resume-listening' }
+  | { readonly type: 'select-audio-input'; readonly deviceId: string }
   | {
       readonly type: 'select-tuning-method'
       readonly tuningMethod: TuningSessionSnapshot['tuningMethod']
@@ -318,6 +335,9 @@ export function createTuningSession({
     readings: number
   } | null = null
   let lifecycleStatus: TuningSessionSnapshot['lifecycleStatus'] = 'inactive'
+  let interruptionReason: TuningSessionSnapshot['interruptionReason'] = null
+  let audioInputs: readonly AudioInputDevice[] = Object.freeze([])
+  let selectedAudioInputId: string | null = null
   let microphoneError: MicrophoneError | null = null
   let pitchFeedback: TuningSessionSnapshot['pitchFeedback'] = 'no-signal'
   let appliedAudioSettings: AudioDeviceSettings | null = null
@@ -329,6 +349,19 @@ export function createTuningSession({
   let estimationInFlight = false
   const pitchFeedbackTracker = createPitchFeedbackTracker()
   let microphoneAbortController: AbortController | undefined
+  let inactivityTimer: ReturnType<typeof setTimeout> | undefined
+
+  function clearInactivityTimer() {
+    if (inactivityTimer !== undefined) clearTimeout(inactivityTimer)
+    inactivityTimer = undefined
+  }
+
+  function scheduleInactivityStop() {
+    clearInactivityTimer()
+    inactivityTimer = setTimeout(() => {
+      void interruptListening('inactive')
+    }, 300_000)
+  }
 
   function resetPitchTracking(nextPitchFeedback: PitchFeedback) {
     detectedPitch = null
@@ -419,9 +452,11 @@ export function createTuningSession({
       }),
       chromaticTarget,
       concertPitchHz,
+      audioInputs,
       instrument,
       instruments: availableInstruments,
       lifecycleStatus,
+      interruptionReason,
       microphoneError,
       pitchFeedback,
       diagnostics: Object.freeze({
@@ -434,6 +469,7 @@ export function createTuningSession({
       referenceToneError,
       referenceToneStatus,
       selectedString,
+      selectedAudioInputId,
       stringLock,
       strings,
       targetPitch: getSelectedTarget(),
@@ -464,12 +500,42 @@ export function createTuningSession({
   }
 
   async function stopListeningCapture() {
+    clearInactivityTimer()
     microphoneAbortController?.abort()
     await microphoneInput?.stop()
     lifecycleStatus = 'inactive'
   }
 
+  async function interruptListening(
+    reason: MicrophoneInterruption | 'inactive',
+  ) {
+    if (lifecycleStatus !== 'starting' && lifecycleStatus !== 'listening')
+      return
+    clearInactivityTimer()
+    microphoneAbortController?.abort()
+    resetPitchTracking('no-signal')
+    lifecycleStatus = 'interrupted'
+    interruptionReason = reason
+    publishSnapshot()
+    await microphoneInput?.stop()
+  }
+
   async function executeCommand(command: TuningSessionCommand) {
+    if (command.type === 'resume-listening') {
+      if (lifecycleStatus !== 'interrupted') return
+      return executeCommand({ type: 'start-listening' })
+    }
+
+    if (command.type === 'select-audio-input') {
+      if (selectedAudioInputId === command.deviceId) return
+      selectedAudioInputId = command.deviceId
+      const restart = lifecycleStatus === 'listening'
+      if (restart) await stopListeningCapture()
+      if (restart) return executeCommand({ type: 'start-listening' })
+      publishSnapshot()
+      return
+    }
+
     if (command.type === 'start-listening') {
       if (lifecycleStatus === 'starting' || lifecycleStatus === 'listening') {
         return
@@ -477,6 +543,7 @@ export function createTuningSession({
 
       tuningMethod = 'listen'
       lifecycleStatus = 'starting'
+      interruptionReason = null
       microphoneError = null
       resetPitchTracking('no-signal')
       appliedAudioSettings = null
@@ -514,10 +581,14 @@ export function createTuningSession({
       try {
         const initialPitchAnalysis = getPitchAnalysisRequirements()
         const capture = await microphoneInput.start({
+          ...(selectedAudioInputId ? { deviceId: selectedAudioInputId } : {}),
           minimumAnalysisWindowSeconds:
             initialPitchAnalysis.minimumPeriods /
             initialPitchAnalysis.minimumFrequencyHz,
           signal: controller.signal,
+          onInterruption(reason) {
+            void interruptListening(reason)
+          },
           onFrame(frame) {
             if (controller.signal.aborted || lifecycleStatus !== 'listening') {
               return
@@ -528,6 +599,9 @@ export function createTuningSession({
             signalLevel = frame.samples.length
               ? Math.sqrt(sumOfSquares / frame.samples.length)
               : 0
+            if (!pitchEstimator && signalLevel >= 0.01) {
+              scheduleInactivityStop()
+            }
             frameIntervalMs =
               lastFrameAtMs === null ? null : frame.capturedAtMs - lastFrameAtMs
             lastFrameAtMs = frame.capturedAtMs
@@ -557,6 +631,13 @@ export function createTuningSession({
                 }
 
                 signalLevel = estimation.signalLevel
+                if (
+                  estimation.signalLevel >= 0.01 &&
+                  estimation.frequencyHz !== null &&
+                  estimation.clarity !== null
+                ) {
+                  scheduleInactivityStop()
+                }
                 if (tuningMode === 'guided') {
                   updateAutomaticStringSelection(
                     estimation.frequencyHz,
@@ -614,8 +695,14 @@ export function createTuningSession({
         }
 
         appliedAudioSettings = Object.freeze({ ...capture.appliedSettings })
+        audioInputs = Object.freeze(
+          capture.availableAudioInputs.map((device) =>
+            Object.freeze({ ...device }),
+          ),
+        )
         sampleRateHz = capture.sampleRateHz
         lifecycleStatus = 'listening'
+        scheduleInactivityStop()
       } catch (error) {
         if (controller.signal.aborted) return
         const reason =
@@ -641,6 +728,7 @@ export function createTuningSession({
         } else {
           lifecycleStatus = 'inactive'
         }
+        interruptionReason = null
         microphoneError = null
         resetPitchTracking('no-signal')
       } else if (referenceToneStatus === 'playing') {
@@ -848,6 +936,9 @@ export function createTuningSession({
       if (lifecycleStatus === 'listening') {
         await stopListeningCapture()
         resetPitchTracking('no-signal')
+      } else if (lifecycleStatus === 'interrupted') {
+        lifecycleStatus = 'inactive'
+        interruptionReason = null
       }
       tuningMethod = 'reference-tone'
       microphoneError = null
@@ -864,10 +955,16 @@ export function createTuningSession({
       return
     }
 
-    if (lifecycleStatus === 'starting' || lifecycleStatus === 'listening') {
+    if (
+      lifecycleStatus === 'starting' ||
+      lifecycleStatus === 'listening' ||
+      lifecycleStatus === 'interrupted'
+    ) {
       microphoneAbortController?.abort()
-      await microphoneInput?.stop()
+      if (lifecycleStatus !== 'interrupted') await microphoneInput?.stop()
+      clearInactivityTimer()
       lifecycleStatus = 'inactive'
+      interruptionReason = null
       resetPitchTracking('no-signal')
       publishSnapshot()
       return

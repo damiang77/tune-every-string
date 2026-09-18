@@ -42,6 +42,10 @@
       },
       "string": {
         "label": "Struna"
+      },
+      "audioInput": {
+        "label": "Wejście audio",
+        "browserDefault": "Domyślne przeglądarki"
       }
     },
     "chromatic": {
@@ -73,10 +77,19 @@
         "microphone-unavailable": "Mikrofon jest niedostępny. Podłącz go lub włącz i spróbuj ponownie albo użyj dźwięku wzorcowego.",
         "microphone-unsupported": "Ta przeglądarka nie może tutaj użyć mikrofonu. Użyj obsługiwanej przeglądarki albo dźwięku wzorcowego.",
         "microphone-unreadable": "Nie udało się uruchomić mikrofonu. Zamknij inne aplikacje, które go używają, i spróbuj ponownie albo użyj dźwięku wzorcowego."
+      },
+      "interruption": {
+        "muted": "Mikrofon został wyciszony. Włącz go i wznów strojenie.",
+        "ended": "Mikrofon został odłączony. Sprawdź go i wznów strojenie.",
+        "page-hidden": "Strojenie wstrzymano, gdy strona była ukryta. Wznów je, gdy będziesz gotowy.",
+        "audio-suspended": "Przeglądarka wstrzymała dźwięk. Wznów strojenie, aby kontynuować.",
+        "audio-failed": "Dźwięk przeglądarki został zatrzymany. Sprawdź urządzenie audio i wznów strojenie.",
+        "inactive": "Mikrofon zatrzymał się po pięciu minutach bez użytecznego sygnału. Wznów strojenie, aby spróbować ponownie."
       }
     },
     "action": {
       "start": "Rozpocznij strojenie",
+      "resume": "Wznów strojenie",
       "stopListening": "Zatrzymaj strojenie",
       "useReferenceTone": "Użyj dźwięku wzorcowego",
       "play": "Odtwórz {{noteName}}",

@@ -1,13 +1,49 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup } from '@testing-library/react'
 
 import { App } from './App'
 import {
   createTuningSession,
+  type MicrophoneCapture,
+  type MicrophoneInput,
+  type MicrophoneStartOptions,
   type ReferenceToneOutput,
 } from '../tuning/TuningSession'
+
+class ControlledMicrophoneInput implements MicrophoneInput {
+  readonly starts: MicrophoneStartOptions[] = []
+  stopCount = 0
+  private finish: ((capture: MicrophoneCapture) => void) | undefined
+
+  start(options: MicrophoneStartOptions) {
+    this.starts.push(options)
+    return new Promise<MicrophoneCapture>((resolve) => {
+      this.finish = resolve
+    })
+  }
+
+  finishStart() {
+    this.finish?.({
+      appliedSettings: { deviceId: 'default' },
+      availableAudioInputs: [
+        { deviceId: 'default', label: 'Built-in microphone' },
+        { deviceId: 'usb', label: 'USB microphone' },
+      ],
+      sampleRateHz: 48_000,
+    })
+  }
+
+  stop() {
+    this.stopCount += 1
+    return Promise.resolve()
+  }
+
+  interrupt() {
+    this.starts.at(-1)?.onInterruption('audio-suspended')
+  }
+}
 
 class RecordingToneOutput implements ReferenceToneOutput {
   readonly playedFrequencies: number[] = []
@@ -121,6 +157,54 @@ describe('application routes', () => {
       'The Reference Tone could not start. Check browser audio and try again.',
     )
     expect(screen.getByRole('button', { name: 'Play E2' })).toBeVisible()
+  })
+
+  it('shows permitted audio inputs in settings and switches capture', async () => {
+    const user = userEvent.setup()
+    const microphoneInput = new ControlledMicrophoneInput()
+    const session = createTuningSession({
+      initialTuningMethod: 'listen',
+      microphoneInput,
+      referenceToneOutput: new RecordingToneOutput(),
+    })
+    render(<App session={session} />)
+
+    await user.click(screen.getByRole('button', { name: 'Start tuning' }))
+    microphoneInput.finishStart()
+    expect(await screen.findByText('Listening for a clear note.')).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Settings' }))
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Audio input' }),
+      'usb',
+    )
+    await vi.waitFor(() => expect(microphoneInput.starts).toHaveLength(2))
+    microphoneInput.finishStart()
+
+    expect(microphoneInput.stopCount).toBe(1)
+    expect(microphoneInput.starts[1]?.deviceId).toBe('usb')
+  })
+
+  it('offers a Resume tuning action after an audio interruption', async () => {
+    const user = userEvent.setup()
+    const microphoneInput = new ControlledMicrophoneInput()
+    const session = createTuningSession({
+      initialTuningMethod: 'listen',
+      microphoneInput,
+      referenceToneOutput: new RecordingToneOutput(),
+    })
+    render(<App session={session} />)
+    await user.click(screen.getByRole('button', { name: 'Start tuning' }))
+    microphoneInput.finishStart()
+    await screen.findByText('Listening for a clear note.')
+
+    microphoneInput.interrupt()
+    expect(
+      await screen.findByRole('button', { name: 'Resume tuning' }),
+    ).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Resume tuning' }))
+    microphoneInput.finishStart()
+
+    expect(await screen.findByText('Listening for a clear note.')).toBeVisible()
   })
 
   it('selects and calibrates a Chromatic Reference Tone while preserving the Guided String', async () => {

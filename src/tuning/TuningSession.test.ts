@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
   bass,
@@ -28,7 +28,10 @@ class ControlledMicrophoneInput implements MicrophoneInput {
   private resolveStart: ((capture: MicrophoneCapture) => void) | undefined
   private rejectStart: ((error: unknown) => void) | undefined
 
-  constructor(sampleRateHz = 48_000) {
+  constructor(
+    sampleRateHz = 48_000,
+    availableAudioInputs: MicrophoneCapture['availableAudioInputs'] = [],
+  ) {
     this.capture = {
       appliedSettings: {
         autoGainControl: false,
@@ -37,6 +40,7 @@ class ControlledMicrophoneInput implements MicrophoneInput {
         echoCancellation: false,
         noiseSuppression: false,
       },
+      availableAudioInputs,
       sampleRateHz,
     }
   }
@@ -67,6 +71,13 @@ class ControlledMicrophoneInput implements MicrophoneInput {
       capturedAtMs,
       samples: Float32Array.from(samples),
     })
+  }
+
+  interrupt(
+    reason:
+      'muted' | 'ended' | 'page-hidden' | 'audio-suspended' | 'audio-failed',
+  ) {
+    this.starts.at(-1)?.onInterruption(reason)
   }
 }
 
@@ -192,6 +203,138 @@ class RetuneFailureOutput implements ReferenceToneOutput {
 }
 
 describe('Tuning Session', () => {
+  afterEach(() => vi.useRealTimers())
+
+  it('reveals audio inputs after permission and keeps the browser default selected', async () => {
+    const microphoneInput = new ControlledMicrophoneInput(48_000, [
+      { deviceId: 'built-in', label: 'Built-in microphone' },
+      { deviceId: 'usb', label: 'USB microphone' },
+    ])
+    const session = createTuningSession({
+      microphoneInput,
+      referenceToneOutput: new RecordingToneOutput(),
+    })
+
+    expect(session.getSnapshot().audioInputs).toEqual([])
+    const start = session.dispatch({ type: 'start-listening' })
+    microphoneInput.finishStart()
+    await start
+
+    expect(session.getSnapshot()).toMatchObject({
+      audioInputs: microphoneInput.capture.availableAudioInputs,
+      selectedAudioInputId: null,
+    })
+    expect(microphoneInput.starts[0]).not.toHaveProperty('deviceId')
+  })
+
+  it('replaces capture when the player selects an audio input', async () => {
+    const microphoneInput = new ControlledMicrophoneInput()
+    const session = createTuningSession({
+      microphoneInput,
+      referenceToneOutput: new RecordingToneOutput(),
+    })
+    const start = session.dispatch({ type: 'start-listening' })
+    microphoneInput.finishStart()
+    await start
+
+    const change = session.dispatch({
+      type: 'select-audio-input',
+      deviceId: 'usb',
+    })
+    await vi.waitFor(() => expect(microphoneInput.starts).toHaveLength(2))
+    microphoneInput.finishStart()
+    await change
+
+    expect(microphoneInput.stopCount).toBe(1)
+    expect(microphoneInput.starts[1]?.deviceId).toBe('usb')
+    expect(session.getSnapshot().selectedAudioInputId).toBe('usb')
+  })
+
+  it.each(['muted', 'ended'] as const)(
+    'clears live feedback and offers recovery when the track is %s',
+    async (reason) => {
+      const microphoneInput = new ControlledMicrophoneInput()
+      const session = createTuningSession({
+        microphoneInput,
+        pitchEstimator: createMcleodPitchEstimator(),
+        referenceToneOutput: new RecordingToneOutput(),
+      })
+      const start = session.dispatch({ type: 'start-listening' })
+      microphoneInput.finishStart()
+      await start
+      microphoneInput.sendFrame(createSineFrame(82.407), 0)
+      await flushPitchEstimation()
+
+      microphoneInput.interrupt(reason)
+      await flushPitchEstimation()
+
+      expect(session.getSnapshot()).toMatchObject({
+        detectedPitch: null,
+        interruptionReason: reason,
+        lifecycleStatus: 'interrupted',
+        pitchFeedback: 'no-signal',
+      })
+      expect(microphoneInput.stopCount).toBe(1)
+    },
+  )
+
+  it.each(['page-hidden', 'audio-suspended', 'audio-failed'] as const)(
+    'stops publishing pitch after %s and resumes only from a player command',
+    async (reason) => {
+      const microphoneInput = new ControlledMicrophoneInput()
+      const session = createTuningSession({
+        microphoneInput,
+        pitchEstimator: createMcleodPitchEstimator(),
+        referenceToneOutput: new RecordingToneOutput(),
+      })
+      const start = session.dispatch({ type: 'start-listening' })
+      microphoneInput.finishStart()
+      await start
+
+      microphoneInput.interrupt(reason)
+      microphoneInput.sendFrame(createSineFrame(110), 40)
+      await flushPitchEstimation()
+      expect(session.getSnapshot()).toMatchObject({
+        detectedPitch: null,
+        interruptionReason: reason,
+        lifecycleStatus: 'interrupted',
+      })
+
+      const resume = session.dispatch({ type: 'resume-listening' })
+      await Promise.resolve()
+      microphoneInput.finishStart()
+      await resume
+      expect(session.getSnapshot()).toMatchObject({
+        interruptionReason: null,
+        lifecycleStatus: 'listening',
+      })
+    },
+  )
+
+  it('stops capture after five minutes without usable input and can restart immediately', async () => {
+    vi.useFakeTimers()
+    const microphoneInput = new ControlledMicrophoneInput()
+    const session = createTuningSession({
+      microphoneInput,
+      referenceToneOutput: new RecordingToneOutput(),
+    })
+    const start = session.dispatch({ type: 'start-listening' })
+    microphoneInput.finishStart()
+    await start
+
+    await vi.advanceTimersByTimeAsync(300_000)
+    expect(session.getSnapshot()).toMatchObject({
+      interruptionReason: 'inactive',
+      lifecycleStatus: 'interrupted',
+    })
+    expect(microphoneInput.stopCount).toBe(1)
+
+    const restart = session.dispatch({ type: 'resume-listening' })
+    await Promise.resolve()
+    microphoneInput.finishStart()
+    await restart
+    expect(session.getSnapshot().lifecycleStatus).toBe('listening')
+  })
   it.each([
     ['Standard', bassStandardTuning, ['E1', 'A1', 'D2', 'G2']],
     ['Drop D', bassDropDTuning, ['D1', 'A1', 'D2', 'G2']],

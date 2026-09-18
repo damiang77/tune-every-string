@@ -1,4 +1,5 @@
 import type {
+  AudioInputDevice,
   MicrophoneError,
   MicrophoneInput,
   MicrophoneStartOptions,
@@ -51,10 +52,13 @@ class WebAudioMicrophoneInput implements MicrophoneInput {
   private frameTimer: ReturnType<typeof setInterval> | undefined
   private source: MediaStreamAudioSourceNode | undefined
   private stream: MediaStream | undefined
+  private removeInterruptionListeners: (() => void) | undefined
 
   async start({
+    deviceId,
     minimumAnalysisWindowSeconds,
     onFrame,
+    onInterruption,
     signal,
   }: MicrophoneStartOptions) {
     if (
@@ -81,6 +85,7 @@ class WebAudioMicrophoneInput implements MicrophoneInput {
         channelCount: { ideal: 1 },
         echoCancellation: { ideal: false },
         noiseSuppression: { ideal: false },
+        ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
       },
       video: false,
     })
@@ -142,6 +147,31 @@ class WebAudioMicrophoneInput implements MicrophoneInput {
         })
       }, FRAME_INTERVAL_MS)
 
+      const track = stream.getAudioTracks()[0]
+      const handleMuted = () => onInterruption('muted')
+      const handleEnded = () => onInterruption('ended')
+      const handleVisibilityChange = () => {
+        if (document.hidden) onInterruption('page-hidden')
+      }
+      const handleAudioStateChange = () => {
+        const state = audioContext.state as string
+        if (state === 'suspended' || state === 'interrupted') {
+          onInterruption('audio-suspended')
+        } else if (state === 'closed') {
+          onInterruption('audio-failed')
+        }
+      }
+      track?.addEventListener('mute', handleMuted)
+      track?.addEventListener('ended', handleEnded)
+      document.addEventListener('visibilitychange', handleVisibilityChange)
+      audioContext.addEventListener('statechange', handleAudioStateChange)
+      this.removeInterruptionListeners = () => {
+        track?.removeEventListener('mute', handleMuted)
+        track?.removeEventListener('ended', handleEnded)
+        document.removeEventListener('visibilitychange', handleVisibilityChange)
+        audioContext.removeEventListener('statechange', handleAudioStateChange)
+      }
+
       const settings = stream.getAudioTracks()[0]?.getSettings() ?? {}
       const appliedSettings = {
         ...(typeof settings.autoGainControl === 'boolean'
@@ -160,8 +190,20 @@ class WebAudioMicrophoneInput implements MicrophoneInput {
           ? { noiseSuppression: settings.noiseSuppression }
           : {}),
       }
+      let availableAudioInputs: readonly AudioInputDevice[] = []
+      try {
+        availableAudioInputs = (await navigator.mediaDevices.enumerateDevices())
+          .filter(({ kind }) => kind === 'audioinput')
+          .map(({ deviceId: inputDeviceId, label }) => ({
+            deviceId: inputDeviceId,
+            label: label || 'Microphone',
+          }))
+      } catch {
+        // Capture can continue when a browser does not expose device enumeration.
+      }
       return {
         appliedSettings,
+        availableAudioInputs,
         sampleRateHz: audioContext.sampleRate,
       }
     } catch (error) {
@@ -174,6 +216,8 @@ class WebAudioMicrophoneInput implements MicrophoneInput {
   async stop() {
     if (this.frameTimer !== undefined) clearInterval(this.frameTimer)
     this.frameTimer = undefined
+    this.removeInterruptionListeners?.()
+    this.removeInterruptionListeners = undefined
     this.source?.disconnect()
     this.analyser?.disconnect()
     this.stream?.getTracks().forEach((track) => track.stop())
