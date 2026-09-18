@@ -4,8 +4,18 @@ import type {
   MicrophoneStartOptions,
 } from './TuningSession'
 
-const ANALYSER_FRAME_SIZE = 4_096
 const FRAME_INTERVAL_MS = 40
+
+function analyserFrameSize(
+  sampleRateHz: number,
+  minimumAnalysisWindowSeconds: number,
+) {
+  const requiredSamples = sampleRateHz * minimumAnalysisWindowSeconds
+  return Math.min(
+    32_768,
+    Math.max(32, 2 ** Math.ceil(Math.log2(requiredSamples))),
+  )
+}
 
 interface MicrophoneFailure {
   readonly reason: MicrophoneError
@@ -42,7 +52,11 @@ class WebAudioMicrophoneInput implements MicrophoneInput {
   private source: MediaStreamAudioSourceNode | undefined
   private stream: MediaStream | undefined
 
-  async start({ onFrame, signal }: MicrophoneStartOptions) {
+  async start({
+    minimumAnalysisWindowSeconds,
+    onFrame,
+    signal,
+  }: MicrophoneStartOptions) {
     if (
       !navigator.mediaDevices?.getUserMedia ||
       typeof AudioContext === 'undefined'
@@ -110,7 +124,10 @@ class WebAudioMicrophoneInput implements MicrophoneInput {
     try {
       const source = audioContext.createMediaStreamSource(stream)
       const analyser = audioContext.createAnalyser()
-      analyser.fftSize = ANALYSER_FRAME_SIZE
+      analyser.fftSize = analyserFrameSize(
+        audioContext.sampleRate,
+        minimumAnalysisWindowSeconds,
+      )
       source.connect(analyser)
 
       const samples = new Float32Array(analyser.fftSize)

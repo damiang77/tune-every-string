@@ -21,7 +21,8 @@
     "selection": {
       "instrument": {
         "label": "Instrument",
-        "guitar": "Guitar"
+        "guitar": "Guitar",
+        "bass": "Bass"
       },
       "preset": {
         "label": "Tuning preset",
@@ -83,7 +84,10 @@
       "lockString": "Lock {{noteName}}",
       "unlockString": "Unlock {{noteName}}"
     },
-    "guitarPreset": "Six-string guitar · {{preset}}",
+    "instrumentPreset": {
+      "guitar": "Six-string guitar · {{preset}}",
+      "bass": "Four-string bass · {{preset}}"
+    },
     "standardGuitar": "Six-string guitar · Standard tuning",
     "privacy": "Audio is processed on this device. It is not recorded or uploaded.",
     "diagnostics": {

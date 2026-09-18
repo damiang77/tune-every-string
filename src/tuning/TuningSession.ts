@@ -1,8 +1,12 @@
 import {
+  bass,
+  bassStandardTuning,
   guitar,
-  guitarTuningPresets,
   guitarStandardTuning,
+  getTuningPresets,
+  instruments,
   type Instrument,
+  type PitchAnalysisRequirements,
   type TuningPreset,
 } from './TuningCatalog'
 import {
@@ -55,6 +59,7 @@ export interface MicrophoneFrame {
 }
 
 export interface MicrophoneStartOptions {
+  readonly minimumAnalysisWindowSeconds: number
   readonly onFrame: (frame: MicrophoneFrame) => void
   readonly signal: AbortSignal
 }
@@ -84,6 +89,7 @@ export interface TuningSessionSnapshot {
   readonly chromaticTarget: TargetPitch
   readonly concertPitchHz: number
   readonly instrument: Instrument
+  readonly instruments: readonly Instrument[]
   readonly lifecycleStatus: 'inactive' | 'starting' | 'listening' | 'failed'
   readonly microphoneError: MicrophoneError | null
   readonly pitchFeedback: PitchFeedback
@@ -122,6 +128,7 @@ export type TuningSessionCommand =
       readonly octave: ChromaticOctave
     }
   | { readonly type: 'set-concert-pitch'; readonly concertPitchHz: number }
+  | { readonly type: 'select-instrument'; readonly instrumentId: string }
   | { readonly type: 'select-string'; readonly stringId: string }
   | { readonly type: 'set-string-lock'; readonly locked: boolean }
   | { readonly type: 'select-tuning-preset'; readonly tuningPresetId: string }
@@ -184,33 +191,59 @@ export function createTuningSession({
   assertConcertPitch(initialConcertPitchHz)
   let concertPitchHz = initialConcertPitchHz
 
-  const instrument: Instrument = Object.freeze({
-    ...instrumentInput,
-    strings: Object.freeze(
-      instrumentInput.strings.map((string) => Object.freeze({ ...string })),
-    ),
+  const defaultPitchAnalysis: PitchAnalysisRequirements = Object.freeze({
+    maximumFrequencyHz: 420,
+    minimumFrequencyHz: 30,
+    minimumPeriods: 3,
   })
-  const availableTuningPresetInputs =
-    instrument.id === guitar.id
-      ? guitarTuningPresets.map((preset) =>
+
+  function freezeInstrument(input: Instrument): Instrument {
+    return Object.freeze({
+      ...input,
+      pitchAnalysis: Object.freeze({
+        ...(input.pitchAnalysis ?? defaultPitchAnalysis),
+      }),
+      strings: Object.freeze(
+        input.strings.map((string) => Object.freeze({ ...string })),
+      ),
+    })
+  }
+
+  function freezePresets(inputs: readonly TuningPreset[]) {
+    return Object.freeze(
+      inputs.map((preset) =>
+        Object.freeze({
+          ...preset,
+          targets: Object.freeze(
+            preset.targets.map((target) => Object.freeze({ ...target })),
+          ),
+        }),
+      ),
+    )
+  }
+
+  const availableInstruments = Object.freeze(
+    (instruments.some(({ id }) => id === instrumentInput.id)
+      ? instruments
+      : [instrumentInput]
+    ).map(freezeInstrument),
+  )
+  let instrument =
+    availableInstruments.find(({ id }) => id === instrumentInput.id) ??
+    freezeInstrument(instrumentInput)
+  let tuningPresets = freezePresets(
+    getTuningPresets(instrument.id).length
+      ? getTuningPresets(instrument.id).map((preset) =>
           preset.id === tuningPresetInput.id ? tuningPresetInput : preset,
         )
-      : [tuningPresetInput]
-  const tuningPresets = Object.freeze(
-    availableTuningPresetInputs.map((preset) =>
-      Object.freeze({
-        ...preset,
-        targets: Object.freeze(
-          preset.targets.map((target) => Object.freeze({ ...target })),
-        ),
-      }),
-    ),
+      : [tuningPresetInput],
   )
   const savedTuningPresetId = preferenceStore?.loadGuitarTuningPresetId?.()
   let tuningPreset =
     tuningPresets.find(({ id }) => id === savedTuningPresetId) ??
     tuningPresets.find(({ id }) => id === tuningPresetInput.id) ??
     tuningPresets[0]!
+  const selectedPresetIds = new Map([[instrument.id, tuningPreset.id]])
 
   if (tuningPreset.instrumentId !== instrument.id) {
     throw new Error('The Tuning Preset does not belong to the Instrument')
@@ -374,6 +407,7 @@ export function createTuningSession({
       chromaticTarget,
       concertPitchHz,
       instrument,
+      instruments: availableInstruments,
       lifecycleStatus,
       microphoneError,
       pitchFeedback,
@@ -444,6 +478,9 @@ export function createTuningSession({
 
       try {
         const capture = await microphoneInput.start({
+          minimumAnalysisWindowSeconds:
+            (instrument.pitchAnalysis?.minimumPeriods ?? 3) /
+            (instrument.pitchAnalysis?.minimumFrequencyHz ?? 30),
           signal: controller.signal,
           onFrame(frame) {
             if (controller.signal.aborted || lifecycleStatus !== 'listening') {
@@ -468,7 +505,12 @@ export function createTuningSession({
             const estimatedTuningMode = tuningMode
             const estimatedTargetFrequencyHz = getSelectedTarget().frequencyHz
             void pitchEstimator
-              .estimate(frame.samples, sampleRateHz ?? captureSampleRateHz)
+              .estimate(frame.samples, sampleRateHz ?? captureSampleRateHz, {
+                maximumFrequencyHz:
+                  instrument.pitchAnalysis?.maximumFrequencyHz ?? 420,
+                minimumFrequencyHz:
+                  instrument.pitchAnalysis?.minimumFrequencyHz ?? 30,
+              })
               .then((estimation) => {
                 if (
                   controller.signal.aborted ||
@@ -627,6 +669,41 @@ export function createTuningSession({
       return
     }
 
+    if (command.type === 'select-instrument') {
+      const nextInstrument = availableInstruments.find(
+        ({ id }) => id === command.instrumentId,
+      )
+      if (!nextInstrument) {
+        throw new Error(`Unknown Instrument: ${command.instrumentId}`)
+      }
+      if (nextInstrument === instrument) return
+
+      if (lifecycleStatus === 'starting' || lifecycleStatus === 'listening') {
+        microphoneAbortController?.abort()
+        await microphoneInput?.stop()
+        lifecycleStatus = 'inactive'
+      }
+
+      instrument = nextInstrument
+      const catalogPresets = getTuningPresets(instrument.id)
+      tuningPresets = freezePresets(catalogPresets)
+      tuningPreset =
+        tuningPresets.find(
+          ({ id }) => id === selectedPresetIds.get(instrument.id),
+        ) ??
+        tuningPresets.find(({ id }) => id === 'standard') ??
+        (instrument.id === bass.id ? bassStandardTuning : guitarStandardTuning)
+      selectedPresetIds.set(instrument.id, tuningPreset.id)
+      strings = createTuningStrings(concertPitchHz)
+      selectedString = strings[0]!
+      stringLock = false
+      referenceToneError = null
+      resetPitchTracking('no-signal')
+      await retunePlayingReferenceTone(selectedString)
+      publishSnapshot()
+      return
+    }
+
     if (command.type === 'select-tuning-mode') {
       if (command.tuningMode === tuningMode) return
 
@@ -652,10 +729,13 @@ export function createTuningSession({
 
       const selectedStringId = selectedString.id
       tuningPreset = nextPreset
+      selectedPresetIds.set(instrument.id, tuningPreset.id)
       strings = createTuningStrings(concertPitchHz)
       selectedString =
         strings.find(({ id }) => id === selectedStringId) ?? strings[0]!
-      preferenceStore?.saveGuitarTuningPresetId?.(tuningPreset.id)
+      if (instrument.id === guitar.id) {
+        preferenceStore?.saveGuitarTuningPresetId?.(tuningPreset.id)
+      }
       referenceToneError = null
       resetPitchTracking(
         lifecycleStatus === 'listening' ? 'acquiring' : 'no-signal',

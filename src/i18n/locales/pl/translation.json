@@ -21,7 +21,8 @@
     "selection": {
       "instrument": {
         "label": "Instrument",
-        "guitar": "Gitara"
+        "guitar": "Gitara",
+        "bass": "Gitara basowa"
       },
       "preset": {
         "label": "Strój",
@@ -83,7 +84,10 @@
       "lockString": "Zablokuj {{noteName}}",
       "unlockString": "Odblokuj {{noteName}}"
     },
-    "guitarPreset": "Gitara sześciostrunowa · {{preset}}",
+    "instrumentPreset": {
+      "guitar": "Gitara sześciostrunowa · {{preset}}",
+      "bass": "Gitara basowa czterostrunowa · {{preset}}"
+    },
     "standardGuitar": "Gitara sześciostrunowa · Strój standardowy",
     "privacy": "Dźwięk jest przetwarzany na tym urządzeniu. Nie jest nagrywany ani wysyłany.",
     "diagnostics": {

@@ -44,13 +44,17 @@ class WebWorkerPitchEstimator implements PitchEstimator {
     return worker
   }
 
-  estimate(samples: Float32Array, sampleRateHz: number) {
+  estimate(
+    samples: Float32Array,
+    sampleRateHz: number,
+    range?: Parameters<PitchEstimator['estimate']>[2],
+  ) {
     const id = this.nextRequestId
     this.nextRequestId += 1
 
     return new Promise<PitchEstimation>((resolve, reject) => {
       this.pending.set(id, { reject, resolve })
-      this.getWorker().postMessage({ id, sampleRateHz, samples })
+      this.getWorker().postMessage({ id, range, sampleRateHz, samples })
     })
   }
 }

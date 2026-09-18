@@ -53,6 +53,16 @@ export function TunerScreen({
     return t('tuner.selection.preset.standard')
   }
 
+  const instrumentLabel = (instrumentId: string) =>
+    instrumentId === 'bass'
+      ? t('tuner.selection.instrument.bass')
+      : t('tuner.selection.instrument.guitar')
+
+  const instrumentPresetLabel = (preset: string) =>
+    snapshot.instrument.id === 'bass'
+      ? t('tuner.instrumentPreset.bass', { preset })
+      : t('tuner.instrumentPreset.guitar', { preset })
+
   const pitchFeedbackLabel = () => {
     if (snapshot.pitchFeedback === 'no-signal')
       return t('tuner.status.noSignal')
@@ -192,9 +202,7 @@ export function TunerScreen({
           <h2 className={styles.srOnly} id="tuner-heading">
             {t('tuner.heading')}
           </h2>
-          <p className={styles.preset}>
-            {t('tuner.guitarPreset', { preset: presetLabel })}
-          </p>
+          <p className={styles.preset}>{instrumentPresetLabel(presetLabel)}</p>
 
           {snapshot.tuningMode === 'guided' ? (
             <div
@@ -340,6 +348,28 @@ export function TunerScreen({
                   <path d="m6 6 12 12M18 6 6 18" />
                 </svg>
               </button>
+            </div>
+
+            <div className={styles.settingGroup}>
+              <label className={styles.presetSetting}>
+                <span>{t('tuner.selection.instrument.label')}</span>
+                <select
+                  aria-label={t('tuner.selection.instrument.label')}
+                  onChange={(event) =>
+                    void session.dispatch({
+                      type: 'select-instrument',
+                      instrumentId: event.currentTarget.value,
+                    })
+                  }
+                  value={snapshot.instrument.id}
+                >
+                  {snapshot.instruments.map((instrument) => (
+                    <option key={instrument.id} value={instrument.id}>
+                      {instrumentLabel(instrument.id)}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
 
             <div className={styles.settingGroup}>

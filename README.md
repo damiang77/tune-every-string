@@ -2,14 +2,14 @@
 
 Tune Every String is a browser tuner for guitar and bass. It will start in an approachable guided mode, with chromatic tuning available when a preset is not enough. More string instruments can be added without changing the product foundation.
 
-The current implementation includes the bilingual application shell, guided Reference Tones for six-string Guitar Standard tuning, calibrated Chromatic Reference Tones from C1 through B7, and local microphone capture with MPM pitch feedback for a selected Guitar String.
+The current implementation includes a bilingual Tuner Screen, automatic Guided tuning for six-string Guitar and four-string Bass, calibrated Chromatic Reference Tones from C1 through B7, and local microphone capture with MPM pitch feedback.
 
 ## Product principles
 
 - English at `/` and Polish at `/pl`, selected only from the URL
 - Audio processed on the device, never uploaded for tuning
 - Automatic guided tuning by default, with chromatic mode available
-- Continuous triangle-wave Reference Tones for E2, A2, D3, G3, B3, and E4
+- Continuous triangle-wave Reference Tones for every Guitar and Bass String in Standard, Drop D, and Half Step Down
 - Chromatic Reference Tones from C1 through B7 with adjustable Concert Pitch and remembered sharps-or-flats spelling
 - A calm, responsive interface that works well on phones and desktops
 - A brand name kept in one configuration file so it can be changed cleanly

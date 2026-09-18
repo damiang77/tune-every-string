@@ -8,8 +8,14 @@ export interface PitchEstimator {
   estimate(
     samples: Float32Array,
     sampleRateHz: number,
+    range?: PitchEstimationRange,
   ): Promise<PitchEstimation>
   stop?(): void
+}
+
+export interface PitchEstimationRange {
+  readonly maximumFrequencyHz: number
+  readonly minimumFrequencyHz: number
 }
 
 const MIN_FREQUENCY_HZ = 30
@@ -31,6 +37,10 @@ function parabolicPeak(values: Float64Array, index: number) {
 export async function estimatePitchWithMcleod(
   samples: Float32Array,
   sampleRateHz: number,
+  range: PitchEstimationRange = {
+    maximumFrequencyHz: MAX_FREQUENCY_HZ,
+    minimumFrequencyHz: MIN_FREQUENCY_HZ,
+  },
 ): Promise<PitchEstimation> {
   let energy = 0
   for (const sample of samples) energy += sample * sample
@@ -40,10 +50,13 @@ export async function estimatePitchWithMcleod(
     return { clarity: null, frequencyHz: null, signalLevel }
   }
 
-  const minimumLag = Math.max(2, Math.floor(sampleRateHz / MAX_FREQUENCY_HZ))
+  const minimumLag = Math.max(
+    2,
+    Math.floor(sampleRateHz / range.maximumFrequencyHz),
+  )
   const maximumLag = Math.min(
     samples.length - 2,
-    Math.ceil(sampleRateHz / MIN_FREQUENCY_HZ),
+    Math.ceil(sampleRateHz / range.minimumFrequencyHz),
   )
   const normalizedSquareDifference = new Float64Array(maximumLag + 1)
 

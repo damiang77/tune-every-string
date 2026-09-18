@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  bass,
+  bassDropDTuning,
+  bassHalfStepDownTuning,
+  bassStandardTuning,
   guitarDropDTuning,
   guitarHalfStepDownTuning,
   guitarStandardTuning,
@@ -87,12 +91,23 @@ function createSineFrame(
   frequencyHz: number,
   sampleRateHz = 48_000,
   amplitude = 0.5,
+  sampleCount = 4_096,
 ) {
   return Array.from(
-    { length: 4_096 },
+    { length: sampleCount },
     (_, index) =>
       amplitude * Math.sin((2 * Math.PI * frequencyHz * index) / sampleRateHz),
   )
+}
+
+function createBassFrameWithStrongSecondHarmonic(
+  frequencyHz: number,
+  sampleRateHz = 48_000,
+) {
+  return Array.from({ length: 8_192 }, (_, index) => {
+    const phase = (2 * Math.PI * frequencyHz * index) / sampleRateHz
+    return 0.18 * Math.sin(phase) + 0.5 * Math.sin(2 * phase)
+  })
 }
 
 function createNoiseFrame() {
@@ -177,6 +192,204 @@ class RetuneFailureOutput implements ReferenceToneOutput {
 }
 
 describe('Tuning Session', () => {
+  it.each([
+    ['Standard', bassStandardTuning, ['E1', 'A1', 'D2', 'G2']],
+    ['Drop D', bassDropDTuning, ['D1', 'A1', 'D2', 'G2']],
+    ['Half Step Down', bassHalfStepDownTuning, ['E♭1', 'A♭1', 'D♭2', 'G♭2']],
+  ])(
+    'exposes every Bass String in %s from lowest to highest pitch',
+    (_, preset, noteNames) => {
+      const session = createTuningSession({
+        instrument: bass,
+        referenceToneOutput: new RecordingToneOutput(),
+        tuningPreset: preset,
+      })
+
+      expect(
+        session.getSnapshot().strings.map(({ noteName }) => noteName),
+      ).toEqual(noteNames)
+      expect(
+        session.getSnapshot().strings.map(({ frequencyHz }) => frequencyHz),
+      ).toEqual(
+        [
+          ...session
+            .getSnapshot()
+            .strings.map(({ frequencyHz }) => frequencyHz),
+        ].sort((first, second) => first - second),
+      )
+    },
+  )
+
+  it.each([430, 440, 450])(
+    'derives every Bass Target Pitch at A4 = %i Hz',
+    (concertPitchHz) => {
+      for (const tuningPreset of [
+        bassStandardTuning,
+        bassDropDTuning,
+        bassHalfStepDownTuning,
+      ]) {
+        const session = createTuningSession({
+          concertPitchHz,
+          instrument: bass,
+          referenceToneOutput: new RecordingToneOutput(),
+          tuningPreset,
+        })
+
+        for (const target of session.getSnapshot().strings) {
+          const expectedFrequencyHz =
+            concertPitchHz * 2 ** ((target.midiNoteNumber - 69) / 12)
+          expect(target.frequencyHz).toBeCloseTo(expectedFrequencyHz, 8)
+        }
+      }
+    },
+  )
+
+  it('configures enough bass audio for D1 and records evidence within 200 milliseconds', async () => {
+    const microphoneInput = new ControlledMicrophoneInput()
+    const session = createTuningSession({
+      initialTuningMethod: 'listen',
+      instrument: bass,
+      microphoneInput,
+      pitchEstimator: createMcleodPitchEstimator(),
+      referenceToneOutput: new RecordingToneOutput(),
+      tuningPreset: bassDropDTuning,
+    })
+    const start = session.dispatch({ type: 'start-listening' })
+    microphoneInput.finishStart()
+    await start
+
+    const analysisWindowSeconds =
+      microphoneInput.starts[0]?.minimumAnalysisWindowSeconds
+    expect(analysisWindowSeconds).toBeCloseTo(4 / 30, 8)
+    expect(analysisWindowSeconds).toBeLessThan(0.2)
+
+    microphoneInput.sendFrame(createSineFrame(36.708, 48_000, 0.5, 8_192), 171)
+    await flushPitchEstimation()
+
+    expect(session.getSnapshot()).toMatchObject({
+      detectedPitch: { frequencyHz: expect.closeTo(36.708, 1) },
+      selectedString: { noteName: 'D1' },
+    })
+  })
+
+  it('keeps a harmonic-heavy D1 bass signal on its fundamental', async () => {
+    const microphoneInput = new ControlledMicrophoneInput()
+    const session = createTuningSession({
+      initialTuningMethod: 'listen',
+      instrument: bass,
+      microphoneInput,
+      pitchEstimator: createMcleodPitchEstimator(),
+      referenceToneOutput: new RecordingToneOutput(),
+      tuningPreset: bassDropDTuning,
+    })
+    const start = session.dispatch({ type: 'start-listening' })
+    microphoneInput.finishStart()
+    await start
+
+    microphoneInput.sendFrame(
+      createBassFrameWithStrongSecondHarmonic(36.708),
+      0,
+    )
+    await flushPitchEstimation()
+
+    expect(session.getSnapshot().detectedPitch?.frequencyHz).toBeCloseTo(
+      36.708,
+      1,
+    )
+  })
+
+  it.each([
+    ['bass-3', 55, 'A1'],
+    ['bass-2', 73.416, 'D2'],
+    ['bass-1', 97.999, 'G2'],
+  ])(
+    'automatically selects %s after three clear Bass readings',
+    async (_, frequencyHz, expectedNoteName) => {
+      const microphoneInput = new ControlledMicrophoneInput()
+      const pitchEstimator = new DeferredPitchEstimator()
+      const session = createTuningSession({
+        initialTuningMethod: 'listen',
+        instrument: bass,
+        microphoneInput,
+        pitchEstimator,
+        referenceToneOutput: new RecordingToneOutput(),
+        tuningPreset: bassDropDTuning,
+      })
+      const start = session.dispatch({ type: 'start-listening' })
+      microphoneInput.finishStart()
+      await start
+
+      for (const capturedAtMs of [0, 40, 80]) {
+        microphoneInput.sendFrame([0.5, -0.5], capturedAtMs)
+        pitchEstimator.resolve({
+          clarity: 0.99,
+          frequencyHz,
+          signalLevel: 0.5,
+        })
+        await flushPitchEstimation()
+      }
+
+      expect(session.getSnapshot().selectedString.noteName).toBe(
+        expectedNoteName,
+      )
+    },
+  )
+
+  it('keeps Bass Pitch Feedback on the locked String', async () => {
+    const microphoneInput = new ControlledMicrophoneInput()
+    const pitchEstimator = new DeferredPitchEstimator()
+    const session = createTuningSession({
+      initialTuningMethod: 'listen',
+      instrument: bass,
+      microphoneInput,
+      pitchEstimator,
+      referenceToneOutput: new RecordingToneOutput(),
+      tuningPreset: bassDropDTuning,
+    })
+    const start = session.dispatch({ type: 'start-listening' })
+    microphoneInput.finishStart()
+    await start
+    await session.dispatch({ type: 'set-string-lock', locked: true })
+
+    for (const capturedAtMs of [0, 40, 80]) {
+      microphoneInput.sendFrame([0.5, -0.5], capturedAtMs)
+      pitchEstimator.resolve({
+        clarity: 0.99,
+        frequencyHz: 55,
+        signalLevel: 0.5,
+      })
+      await flushPitchEstimation()
+    }
+
+    expect(session.getSnapshot()).toMatchObject({
+      pitchFeedback: 'too-high',
+      selectedString: { noteName: 'D1' },
+      stringLock: true,
+    })
+  })
+
+  it('switches to Bass and plays every Standard Bass Reference Tone', async () => {
+    const referenceToneOutput = new RecordingToneOutput()
+    const session = createTuningSession({ referenceToneOutput })
+
+    await session.dispatch({ type: 'select-instrument', instrumentId: 'bass' })
+    await session.dispatch({ type: 'play-reference-tone' })
+    for (const stringId of ['bass-3', 'bass-2', 'bass-1']) {
+      await session.dispatch({ type: 'select-string', stringId })
+    }
+
+    expect(session.getSnapshot()).toMatchObject({
+      instrument: { id: 'bass' },
+      selectedString: { noteName: 'G2' },
+    })
+    expect(referenceToneOutput.playedFrequencies).toEqual([
+      expect.closeTo(41.203, 3),
+      55,
+      expect.closeTo(73.416, 3),
+      expect.closeTo(97.999, 3),
+    ])
+  })
+
   it.each([
     ['Standard', guitarStandardTuning, ['E2', 'A2', 'D3', 'G3', 'B3', 'E4']],
     ['Drop D', guitarDropDTuning, ['D2', 'A2', 'D3', 'G3', 'B3', 'E4']],

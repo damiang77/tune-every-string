@@ -181,4 +181,35 @@ describe('application routes', () => {
     expect(screen.getByRole('button', { name: 'Unlock D2' })).toBeVisible()
     expect(session.getSnapshot().stringLock).toBe(true)
   })
+
+  it('selects Bass and exposes all three four-string presets', async () => {
+    const user = userEvent.setup()
+    const session = createTuningSession({
+      referenceToneOutput: new RecordingToneOutput(),
+    })
+
+    render(<App session={session} />)
+    await user.click(screen.getByRole('button', { name: 'Settings' }))
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Instrument' }),
+      'bass',
+    )
+
+    expect(screen.getByText('Four-string bass · Standard')).toBeVisible()
+    for (const noteName of ['E1', 'A1', 'D2', 'G2']) {
+      expect(screen.getByRole('button', { name: noteName })).toBeVisible()
+    }
+
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Tuning preset' }),
+      'drop-d',
+    )
+    expect(screen.getByRole('button', { name: 'D1' })).toBeVisible()
+
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Tuning preset' }),
+      'half-step-down',
+    )
+    expect(screen.getByRole('button', { name: 'E♭1' })).toBeVisible()
+  })
 })
