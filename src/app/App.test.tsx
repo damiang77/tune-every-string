@@ -130,6 +130,7 @@ describe('application routes', () => {
 
     render(<App session={session} />)
     await user.click(screen.getByRole('button', { name: 'A2' }))
+    await user.click(screen.getByRole('button', { name: 'Settings' }))
     await user.click(screen.getByRole('button', { name: 'Chromatic' }))
     await user.selectOptions(
       screen.getByRole('combobox', { name: 'Note' }),

@@ -14,6 +14,10 @@
     "heading": "Stroik",
     "intro": "Skupiona przestrzeń do strojenia przed każdą sesją.",
     "concertPitch": "Strój koncertowy",
+    "settings": {
+      "open": "Ustawienia",
+      "close": "Zamknij ustawienia"
+    },
     "selection": {
       "instrument": {
         "label": "Instrument",

@@ -14,6 +14,10 @@
     "heading": "Tuner",
     "intro": "A focused tuning space for every practice session.",
     "concertPitch": "Concert pitch",
+    "settings": {
+      "open": "Settings",
+      "close": "Close settings"
+    },
     "selection": {
       "instrument": {
         "label": "Instrument",

@@ -278,6 +278,24 @@ export function createTuningSession({
     return tuningMode === 'guided' ? selectedString : chromaticTarget
   }
 
+  function findClosestString(frequencyHz: number) {
+    let closestString = selectedString
+    let smallestDistanceInCents = Number.POSITIVE_INFINITY
+
+    for (const string of strings) {
+      const distanceInCents = Math.abs(
+        1_200 * Math.log2(frequencyHz / string.frequencyHz),
+      )
+
+      if (distanceInCents < smallestDistanceInCents) {
+        closestString = string
+        smallestDistanceInCents = distanceInCents
+      }
+    }
+
+    return closestString
+  }
+
   function createSnapshot(): TuningSessionSnapshot {
     return Object.freeze({
       accidentalPreference,
@@ -337,6 +355,7 @@ export function createTuningSession({
       }
 
       tuningMethod = 'listen'
+      tuningMode = 'guided'
       lifecycleStatus = 'starting'
       microphoneError = null
       resetPitchTracking('no-signal')
@@ -379,22 +398,36 @@ export function createTuningSession({
 
             if (!pitchEstimator || estimationInFlight) return
             estimationInFlight = true
-            const estimatedStringId = selectedString.id
+            const estimatedTuningMode = tuningMode
+            const estimatedTargetFrequencyHz = getSelectedTarget().frequencyHz
             void pitchEstimator
               .estimate(frame.samples, sampleRateHz ?? captureSampleRateHz)
               .then((estimation) => {
                 if (
                   controller.signal.aborted ||
                   lifecycleStatus !== 'listening' ||
-                  selectedString.id !== estimatedStringId
+                  tuningMode !== estimatedTuningMode ||
+                  getSelectedTarget().frequencyHz !== estimatedTargetFrequencyHz
                 ) {
                   return
                 }
 
                 signalLevel = estimation.signalLevel
+                if (
+                  tuningMode === 'guided' &&
+                  estimation.frequencyHz !== null
+                ) {
+                  const nextString = findClosestString(estimation.frequencyHz)
+
+                  if (nextString !== selectedString) {
+                    selectedString = nextString
+                    pitchFeedbackTracker.reset()
+                  }
+                }
+
                 const trackingResult = pitchFeedbackTracker.update(
                   estimation,
-                  selectedString.frequencyHz,
+                  getSelectedTarget().frequencyHz,
                 )
                 detectedPitch = trackingResult.detectedPitch
                 pitchFeedback = trackingResult.pitchFeedback
@@ -455,6 +488,7 @@ export function createTuningSession({
         referenceToneStatus = 'stopped'
       }
       tuningMethod = command.tuningMethod
+      if (tuningMethod === 'listen') tuningMode = 'guided'
       publishSnapshot()
       return
     }

@@ -236,6 +236,38 @@ describe('Tuning Session', () => {
     await flushPitchEstimation()
   })
 
+  it('automatically selects the nearest String in Guided Listen', async () => {
+    const microphoneInput = new ControlledMicrophoneInput()
+    const session = createTuningSession({
+      microphoneInput,
+      pitchEstimator: createMcleodPitchEstimator(),
+      referenceToneOutput: new RecordingToneOutput(),
+    })
+    await session.dispatch({
+      type: 'select-tuning-mode',
+      tuningMode: 'chromatic',
+    })
+
+    const start = session.dispatch({ type: 'start-listening' })
+    microphoneInput.finishStart()
+    await start
+
+    expect(session.getSnapshot()).toMatchObject({
+      selectedString: { noteName: 'E2' },
+      tuningMode: 'guided',
+    })
+
+    microphoneInput.sendFrame(createSineFrame(110), 0)
+    await flushPitchEstimation()
+
+    expect(session.getSnapshot()).toMatchObject({
+      detectedPitch: { frequencyHz: expect.closeTo(110, 1) },
+      selectedString: { noteName: 'A2' },
+      targetPitch: { noteName: 'A2' },
+      tuningMode: 'guided',
+    })
+  })
+
   it('does not let smoothing turn an out-of-tune reading into a stable result', async () => {
     const microphoneInput = new ControlledMicrophoneInput()
     const session = createTuningSession({
