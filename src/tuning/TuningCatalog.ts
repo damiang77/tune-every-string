@@ -50,3 +50,57 @@ export const guitarStandardTuning: TuningPreset = Object.freeze({
     Object.freeze({ stringId: 'guitar-1', noteName: 'E4', midiNoteNumber: 64 }),
   ]),
 })
+
+export const guitarDropDTuning: TuningPreset = Object.freeze({
+  id: 'drop-d',
+  instrumentId: guitar.id,
+  name: 'Drop D',
+  targets: Object.freeze([
+    Object.freeze({ stringId: 'guitar-6', noteName: 'D2', midiNoteNumber: 38 }),
+    ...guitarStandardTuning.targets.slice(1),
+  ]),
+})
+
+export const guitarHalfStepDownTuning: TuningPreset = Object.freeze({
+  id: 'half-step-down',
+  instrumentId: guitar.id,
+  name: 'Half Step Down',
+  targets: Object.freeze([
+    Object.freeze({
+      stringId: 'guitar-6',
+      noteName: 'E♭2',
+      midiNoteNumber: 39,
+    }),
+    Object.freeze({
+      stringId: 'guitar-5',
+      noteName: 'A♭2',
+      midiNoteNumber: 44,
+    }),
+    Object.freeze({
+      stringId: 'guitar-4',
+      noteName: 'D♭3',
+      midiNoteNumber: 49,
+    }),
+    Object.freeze({
+      stringId: 'guitar-3',
+      noteName: 'G♭3',
+      midiNoteNumber: 54,
+    }),
+    Object.freeze({
+      stringId: 'guitar-2',
+      noteName: 'B♭3',
+      midiNoteNumber: 58,
+    }),
+    Object.freeze({
+      stringId: 'guitar-1',
+      noteName: 'E♭4',
+      midiNoteNumber: 63,
+    }),
+  ]),
+})
+
+export const guitarTuningPresets: readonly TuningPreset[] = Object.freeze([
+  guitarStandardTuning,
+  guitarDropDTuning,
+  guitarHalfStepDownTuning,
+])

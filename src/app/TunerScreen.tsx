@@ -46,6 +46,13 @@ export function TunerScreen({
       ? t('tuner.selection.method.listen')
       : t('tuner.selection.method.referenceTone')
 
+  const tuningPresetLabel = (presetId: string) => {
+    if (presetId === 'drop-d') return t('tuner.selection.preset.drop-d')
+    if (presetId === 'half-step-down')
+      return t('tuner.selection.preset.half-step-down')
+    return t('tuner.selection.preset.standard')
+  }
+
   const pitchFeedbackLabel = () => {
     if (snapshot.pitchFeedback === 'no-signal')
       return t('tuner.status.noSignal')
@@ -122,6 +129,7 @@ export function TunerScreen({
     : isPlaying
       ? t('tuner.action.stop', { noteName: snapshot.targetPitch.noteName })
       : t('tuner.action.play', { noteName: snapshot.targetPitch.noteName })
+  const presetLabel = tuningPresetLabel(snapshot.tuningPreset.id)
 
   return (
     <div className={styles.shell}>
@@ -184,7 +192,9 @@ export function TunerScreen({
           <h2 className={styles.srOnly} id="tuner-heading">
             {t('tuner.heading')}
           </h2>
-          <p className={styles.preset}>{t('tuner.standardGuitar')}</p>
+          <p className={styles.preset}>
+            {t('tuner.guitarPreset', { preset: presetLabel })}
+          </p>
 
           {snapshot.tuningMode === 'guided' ? (
             <div
@@ -205,7 +215,7 @@ export function TunerScreen({
                   }
                   type="button"
                 >
-                  <span>{string.noteName.replace(/\d/g, '')}</span>
+                  <span>{string.noteName}</span>
                   <i />
                 </button>
               ))}
@@ -215,6 +225,28 @@ export function TunerScreen({
               {t('tuner.chromatic.footer')}
             </p>
           )}
+
+          {snapshot.tuningMode === 'guided' ? (
+            <button
+              aria-pressed={snapshot.stringLock}
+              className={styles.stringLockAction}
+              onClick={() =>
+                void session.dispatch({
+                  type: 'set-string-lock',
+                  locked: !snapshot.stringLock,
+                })
+              }
+              type="button"
+            >
+              {snapshot.stringLock
+                ? t('tuner.action.unlockString', {
+                    noteName: snapshot.selectedString.noteName,
+                  })
+                : t('tuner.action.lockString', {
+                    noteName: snapshot.selectedString.noteName,
+                  })}
+            </button>
+          ) : null}
 
           <div className={styles.readout}>
             <div className={styles.noteBlock}>
@@ -308,6 +340,28 @@ export function TunerScreen({
                   <path d="m6 6 12 12M18 6 6 18" />
                 </svg>
               </button>
+            </div>
+
+            <div className={styles.settingGroup}>
+              <label className={styles.presetSetting}>
+                <span>{t('tuner.selection.preset.label')}</span>
+                <select
+                  aria-label={t('tuner.selection.preset.label')}
+                  onChange={(event) =>
+                    void session.dispatch({
+                      type: 'select-tuning-preset',
+                      tuningPresetId: event.currentTarget.value,
+                    })
+                  }
+                  value={snapshot.tuningPreset.id}
+                >
+                  {snapshot.tuningPresets.map((preset) => (
+                    <option key={preset.id} value={preset.id}>
+                      {tuningPresetLabel(preset.id)}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
 
             <div className={styles.settingGroup}>

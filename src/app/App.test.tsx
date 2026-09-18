@@ -159,4 +159,26 @@ describe('application routes', () => {
     expect(screen.getByRole('button', { name: 'Stop A2' })).toBeVisible()
     expect(referenceToneOutput.playedFrequencies.at(-1)).toBe(110.5)
   })
+
+  it('changes the Guitar Tuning Preset and controls String Lock', async () => {
+    const user = userEvent.setup()
+    const session = createTuningSession({
+      referenceToneOutput: new RecordingToneOutput(),
+    })
+
+    render(<App session={session} />)
+    expect(screen.getByRole('button', { name: 'E2' })).toHaveTextContent('E2')
+
+    await user.click(screen.getByRole('button', { name: 'Settings' }))
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Tuning preset' }),
+      'drop-d',
+    )
+    expect(screen.getByRole('button', { name: 'D2' })).toBeVisible()
+    expect(screen.getByText('Six-string guitar · Drop D')).toBeVisible()
+
+    await user.click(screen.getByRole('button', { name: 'Lock D2' }))
+    expect(screen.getByRole('button', { name: 'Unlock D2' })).toBeVisible()
+    expect(session.getSnapshot().stringLock).toBe(true)
+  })
 })

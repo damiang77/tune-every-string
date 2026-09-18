@@ -1,5 +1,6 @@
 import {
   guitar,
+  guitarTuningPresets,
   guitarStandardTuning,
   type Instrument,
   type TuningPreset,
@@ -96,6 +97,8 @@ export interface TuningSessionSnapshot {
   readonly referenceToneError: 'audio-unavailable' | null
   readonly referenceToneStatus: 'stopped' | 'playing'
   readonly selectedString: TuningString
+  readonly stringLock: boolean
+  readonly tuningPresets: readonly TuningPreset[]
   readonly tuningPreset: TuningPreset
   readonly tuningMethod: TuningMethod
   readonly tuningMode: 'guided' | 'chromatic'
@@ -120,6 +123,8 @@ export type TuningSessionCommand =
     }
   | { readonly type: 'set-concert-pitch'; readonly concertPitchHz: number }
   | { readonly type: 'select-string'; readonly stringId: string }
+  | { readonly type: 'set-string-lock'; readonly locked: boolean }
+  | { readonly type: 'select-tuning-preset'; readonly tuningPresetId: string }
   | {
       readonly type: 'select-tuning-mode'
       readonly tuningMode: TuningSessionSnapshot['tuningMode']
@@ -185,29 +190,45 @@ export function createTuningSession({
       instrumentInput.strings.map((string) => Object.freeze({ ...string })),
     ),
   })
-  const tuningPreset: TuningPreset = Object.freeze({
-    ...tuningPresetInput,
-    targets: Object.freeze(
-      tuningPresetInput.targets.map((target) => Object.freeze({ ...target })),
+  const availableTuningPresetInputs =
+    instrument.id === guitar.id
+      ? guitarTuningPresets.map((preset) =>
+          preset.id === tuningPresetInput.id ? tuningPresetInput : preset,
+        )
+      : [tuningPresetInput]
+  const tuningPresets = Object.freeze(
+    availableTuningPresetInputs.map((preset) =>
+      Object.freeze({
+        ...preset,
+        targets: Object.freeze(
+          preset.targets.map((target) => Object.freeze({ ...target })),
+        ),
+      }),
     ),
-  })
+  )
+  const savedTuningPresetId = preferenceStore?.loadGuitarTuningPresetId?.()
+  let tuningPreset =
+    tuningPresets.find(({ id }) => id === savedTuningPresetId) ??
+    tuningPresets.find(({ id }) => id === tuningPresetInput.id) ??
+    tuningPresets[0]!
 
   if (tuningPreset.instrumentId !== instrument.id) {
     throw new Error('The Tuning Preset does not belong to the Instrument')
   }
 
-  const targetsByString = new Map(
-    tuningPreset.targets.map((target) => [target.stringId, target]),
-  )
-
-  if (
-    targetsByString.size !== tuningPreset.targets.length ||
-    tuningPreset.targets.length !== instrument.strings.length
-  ) {
-    throw new Error('A Tuning Preset must assign one Target Pitch per String')
-  }
-
   function createTuningStrings(nextConcertPitchHz: number) {
+    const targetsByString = new Map(
+      tuningPreset.targets.map((target) => [target.stringId, target]),
+    )
+
+    if (
+      tuningPreset.instrumentId !== instrument.id ||
+      targetsByString.size !== tuningPreset.targets.length ||
+      tuningPreset.targets.length !== instrument.strings.length
+    ) {
+      throw new Error('A Tuning Preset must assign one Target Pitch per String')
+    }
+
     return Object.freeze(
       instrument.strings.map(({ id }) => {
         const target = targetsByString.get(id)
@@ -253,8 +274,14 @@ export function createTuningSession({
     concertPitchHz,
   )
   let referenceToneError: TuningSessionSnapshot['referenceToneError'] = null
-  let tuningMode: TuningSessionSnapshot['tuningMode'] = 'guided'
+  let tuningMode: TuningSessionSnapshot['tuningMode'] =
+    preferenceStore?.loadTuningMode?.() ?? 'guided'
   let tuningMethod: TuningSessionSnapshot['tuningMethod'] = initialTuningMethod
+  let stringLock = false
+  let competingCandidate: {
+    readonly stringId: string
+    readings: number
+  } | null = null
   let lifecycleStatus: TuningSessionSnapshot['lifecycleStatus'] = 'inactive'
   let microphoneError: MicrophoneError | null = null
   let pitchFeedback: TuningSessionSnapshot['pitchFeedback'] = 'no-signal'
@@ -272,6 +299,7 @@ export function createTuningSession({
     detectedPitch = null
     pitchFeedbackTracker.reset()
     pitchFeedback = nextPitchFeedback
+    competingCandidate = null
   }
 
   function getSelectedTarget(): TargetPitch {
@@ -294,6 +322,44 @@ export function createTuningSession({
     }
 
     return closestString
+  }
+
+  function updateAutomaticStringSelection(
+    frequencyHz: number | null,
+    clarity: number | null,
+  ) {
+    if (stringLock) return
+    if (frequencyHz === null || clarity === null || clarity < 0.9) {
+      competingCandidate = null
+      return
+    }
+
+    const candidate = findClosestString(frequencyHz)
+    const currentDistance = Math.abs(
+      1_200 * Math.log2(frequencyHz / selectedString.frequencyHz),
+    )
+    const candidateDistance = Math.abs(
+      1_200 * Math.log2(frequencyHz / candidate.frequencyHz),
+    )
+
+    if (
+      candidate === selectedString ||
+      currentDistance - candidateDistance < 20
+    ) {
+      competingCandidate = null
+      return
+    }
+
+    if (competingCandidate?.stringId === candidate.id) {
+      competingCandidate.readings += 1
+    } else {
+      competingCandidate = { stringId: candidate.id, readings: 1 }
+    }
+
+    if (competingCandidate.readings < 3) return
+    selectedString = candidate
+    pitchFeedbackTracker.reset()
+    competingCandidate = null
   }
 
   function createSnapshot(): TuningSessionSnapshot {
@@ -321,11 +387,13 @@ export function createTuningSession({
       referenceToneError,
       referenceToneStatus,
       selectedString,
+      stringLock,
       strings,
       targetPitch: getSelectedTarget(),
       tuningMethod,
       tuningMode,
       tuningPreset,
+      tuningPresets,
     })
   }
 
@@ -355,7 +423,6 @@ export function createTuningSession({
       }
 
       tuningMethod = 'listen'
-      tuningMode = 'guided'
       lifecycleStatus = 'starting'
       microphoneError = null
       resetPitchTracking('no-signal')
@@ -413,16 +480,11 @@ export function createTuningSession({
                 }
 
                 signalLevel = estimation.signalLevel
-                if (
-                  tuningMode === 'guided' &&
-                  estimation.frequencyHz !== null
-                ) {
-                  const nextString = findClosestString(estimation.frequencyHz)
-
-                  if (nextString !== selectedString) {
-                    selectedString = nextString
-                    pitchFeedbackTracker.reset()
-                  }
+                if (tuningMode === 'guided') {
+                  updateAutomaticStringSelection(
+                    estimation.frequencyHz,
+                    estimation.clarity,
+                  )
                 }
 
                 const trackingResult = pitchFeedbackTracker.update(
@@ -488,7 +550,6 @@ export function createTuningSession({
         referenceToneStatus = 'stopped'
       }
       tuningMethod = command.tuningMethod
-      if (tuningMethod === 'listen') tuningMode = 'guided'
       publishSnapshot()
       return
     }
@@ -570,8 +631,46 @@ export function createTuningSession({
       if (command.tuningMode === tuningMode) return
 
       tuningMode = command.tuningMode
+      preferenceStore?.saveTuningMode?.(tuningMode)
+      resetPitchTracking(
+        lifecycleStatus === 'listening' ? 'acquiring' : 'no-signal',
+      )
       referenceToneError = null
       await retunePlayingReferenceTone(getSelectedTarget())
+      publishSnapshot()
+      return
+    }
+
+    if (command.type === 'select-tuning-preset') {
+      const nextPreset = tuningPresets.find(
+        ({ id }) => id === command.tuningPresetId,
+      )
+      if (!nextPreset) {
+        throw new Error(`Unknown Tuning Preset: ${command.tuningPresetId}`)
+      }
+      if (nextPreset === tuningPreset) return
+
+      const selectedStringId = selectedString.id
+      tuningPreset = nextPreset
+      strings = createTuningStrings(concertPitchHz)
+      selectedString =
+        strings.find(({ id }) => id === selectedStringId) ?? strings[0]!
+      preferenceStore?.saveGuitarTuningPresetId?.(tuningPreset.id)
+      referenceToneError = null
+      resetPitchTracking(
+        lifecycleStatus === 'listening' ? 'acquiring' : 'no-signal',
+      )
+      await retunePlayingReferenceTone(getSelectedTarget())
+      publishSnapshot()
+      return
+    }
+
+    if (command.type === 'set-string-lock') {
+      if (stringLock === command.locked) return
+      stringLock = command.locked
+      resetPitchTracking(
+        lifecycleStatus === 'listening' ? 'acquiring' : 'no-signal',
+      )
       publishSnapshot()
       return
     }

@@ -25,7 +25,9 @@
       },
       "preset": {
         "label": "Tuning preset",
-        "standard": "Standard"
+        "standard": "Standard",
+        "drop-d": "Drop D",
+        "half-step-down": "Half Step Down"
       },
       "method": {
         "label": "Tuning method",
@@ -77,8 +79,11 @@
       "stopListening": "Stop tuning",
       "useReferenceTone": "Use Reference Tone",
       "play": "Play {{noteName}}",
-      "stop": "Stop {{noteName}}"
+      "stop": "Stop {{noteName}}",
+      "lockString": "Lock {{noteName}}",
+      "unlockString": "Unlock {{noteName}}"
     },
+    "guitarPreset": "Six-string guitar · {{preset}}",
     "standardGuitar": "Six-string guitar · Standard tuning",
     "privacy": "Audio is processed on this device. It is not recorded or uploaded.",
     "diagnostics": {

@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { guitarStandardTuning } from './TuningCatalog'
+import {
+  guitarDropDTuning,
+  guitarHalfStepDownTuning,
+  guitarStandardTuning,
+} from './TuningCatalog'
 import {
   createMcleodPitchEstimator,
   type PitchEstimation,
@@ -173,6 +177,263 @@ class RetuneFailureOutput implements ReferenceToneOutput {
 }
 
 describe('Tuning Session', () => {
+  it.each([
+    ['Standard', guitarStandardTuning, ['E2', 'A2', 'D3', 'G3', 'B3', 'E4']],
+    ['Drop D', guitarDropDTuning, ['D2', 'A2', 'D3', 'G3', 'B3', 'E4']],
+    [
+      'Half Step Down',
+      guitarHalfStepDownTuning,
+      ['E♭2', 'A♭2', 'D♭3', 'G♭3', 'B♭3', 'E♭4'],
+    ],
+  ])(
+    'exposes every Guitar String in %s from lowest to highest pitch',
+    (_, preset, noteNames) => {
+      const session = createTuningSession({
+        referenceToneOutput: new RecordingToneOutput(),
+        tuningPreset: preset,
+      })
+
+      expect(
+        session.getSnapshot().strings.map(({ noteName }) => noteName),
+      ).toEqual(noteNames)
+      expect(
+        session.getSnapshot().strings.map(({ frequencyHz }) => frequencyHz),
+      ).toEqual(
+        [
+          ...session
+            .getSnapshot()
+            .strings.map(({ frequencyHz }) => frequencyHz),
+        ].sort((a, b) => a - b),
+      )
+    },
+  )
+
+  it('changes Tuning Preset without restarting and retains the selected String', async () => {
+    const session = createTuningSession({
+      referenceToneOutput: new RecordingToneOutput(),
+    })
+    await session.dispatch({ type: 'select-string', stringId: 'guitar-6' })
+
+    await session.dispatch({
+      type: 'select-tuning-preset',
+      tuningPresetId: 'drop-d',
+    })
+
+    expect(session.getSnapshot()).toMatchObject({
+      lifecycleStatus: 'inactive',
+      selectedString: { id: 'guitar-6', noteName: 'D2' },
+      tuningPreset: { id: 'drop-d' },
+    })
+  })
+
+  it('requires a clearly stronger competing String for three readings before automatic selection', async () => {
+    const microphoneInput = new ControlledMicrophoneInput()
+    const pitchEstimator = new DeferredPitchEstimator()
+    const session = createTuningSession({
+      initialTuningMethod: 'listen',
+      microphoneInput,
+      pitchEstimator,
+      referenceToneOutput: new RecordingToneOutput(),
+    })
+    const start = session.dispatch({ type: 'start-listening' })
+    microphoneInput.finishStart()
+    await start
+
+    async function estimate(
+      frequencyHz: number,
+      capturedAtMs: number,
+      clarity = 0.99,
+    ) {
+      microphoneInput.sendFrame([0.5, -0.5], capturedAtMs)
+      pitchEstimator.resolve({ clarity, frequencyHz, signalLevel: 0.5 })
+      await flushPitchEstimation()
+    }
+
+    const boundaryHz = Math.sqrt(82.406889 * 110)
+    await estimate(boundaryHz, 0)
+    await estimate(110, 40)
+    await estimate(82.406889, 80)
+    expect(session.getSnapshot().selectedString.noteName).toBe('E2')
+
+    await estimate(110, 120)
+    await estimate(110, 160)
+    expect(session.getSnapshot().selectedString.noteName).toBe('E2')
+    await estimate(110, 200, 0.5)
+    await estimate(110, 240)
+    await estimate(110, 280)
+    expect(session.getSnapshot().selectedString.noteName).toBe('E2')
+    await estimate(110, 320)
+    expect(session.getSnapshot().selectedString.noteName).toBe('A2')
+  })
+
+  it.each([
+    ['standard', 'guitar-6', 110, 'A2'],
+    ['standard', 'guitar-5', 146.832, 'D3'],
+    ['standard', 'guitar-4', 195.998, 'G3'],
+    ['standard', 'guitar-3', 246.942, 'B3'],
+    ['standard', 'guitar-2', 329.628, 'E4'],
+    ['drop-d', 'guitar-6', 110, 'A2'],
+    ['drop-d', 'guitar-5', 146.832, 'D3'],
+    ['drop-d', 'guitar-4', 195.998, 'G3'],
+    ['drop-d', 'guitar-3', 246.942, 'B3'],
+    ['drop-d', 'guitar-2', 329.628, 'E4'],
+    ['half-step-down', 'guitar-6', 103.826, 'A♭2'],
+    ['half-step-down', 'guitar-5', 138.591, 'D♭3'],
+    ['half-step-down', 'guitar-4', 184.997, 'G♭3'],
+    ['half-step-down', 'guitar-3', 233.082, 'B♭3'],
+    ['half-step-down', 'guitar-2', 311.127, 'E♭4'],
+  ])(
+    'selects across every %s boundary from %s to %s',
+    async (
+      tuningPresetId,
+      initialStringId,
+      competingFrequencyHz,
+      expectedNoteName,
+    ) => {
+      const microphoneInput = new ControlledMicrophoneInput()
+      const pitchEstimator = new DeferredPitchEstimator()
+      const session = createTuningSession({
+        microphoneInput,
+        pitchEstimator,
+        referenceToneOutput: new RecordingToneOutput(),
+      })
+      await session.dispatch({
+        type: 'select-tuning-preset',
+        tuningPresetId,
+      })
+      await session.dispatch({
+        type: 'select-string',
+        stringId: initialStringId,
+      })
+      const start = session.dispatch({ type: 'start-listening' })
+      microphoneInput.finishStart()
+      await start
+
+      for (const capturedAtMs of [0, 40, 80]) {
+        microphoneInput.sendFrame([0.5, -0.5], capturedAtMs)
+        pitchEstimator.resolve({
+          clarity: 0.99,
+          frequencyHz: competingFrequencyHz,
+          signalLevel: 0.5,
+        })
+        await flushPitchEstimation()
+      }
+
+      expect(session.getSnapshot().selectedString.noteName).toBe(
+        expectedNoteName,
+      )
+    },
+  )
+
+  it('keeps Pitch Feedback on the selected String while String Lock is active', async () => {
+    const microphoneInput = new ControlledMicrophoneInput()
+    const pitchEstimator = new DeferredPitchEstimator()
+    const session = createTuningSession({
+      microphoneInput,
+      pitchEstimator,
+      referenceToneOutput: new RecordingToneOutput(),
+    })
+    const start = session.dispatch({ type: 'start-listening' })
+    microphoneInput.finishStart()
+    await start
+    await session.dispatch({ type: 'select-string', stringId: 'guitar-5' })
+    await session.dispatch({ type: 'set-string-lock', locked: true })
+
+    for (const capturedAtMs of [0, 40, 80]) {
+      microphoneInput.sendFrame([0.5, -0.5], capturedAtMs)
+      pitchEstimator.resolve({
+        clarity: 0.99,
+        frequencyHz: 146.832,
+        signalLevel: 0.5,
+      })
+      await flushPitchEstimation()
+    }
+    expect(session.getSnapshot()).toMatchObject({
+      selectedString: { noteName: 'A2' },
+      stringLock: true,
+      pitchFeedback: 'too-high',
+    })
+
+    await session.dispatch({ type: 'set-string-lock', locked: false })
+    for (const capturedAtMs of [120, 160, 200]) {
+      microphoneInput.sendFrame([0.5, -0.5], capturedAtMs)
+      pitchEstimator.resolve({
+        clarity: 0.99,
+        frequencyHz: 146.832,
+        signalLevel: 0.5,
+      })
+      await flushPitchEstimation()
+    }
+    expect(session.getSnapshot()).toMatchObject({
+      selectedString: { noteName: 'D3' },
+      stringLock: false,
+    })
+  })
+
+  it('retains Instrument, Tuning Preset, selected String, and Tuning Mode when switching method', async () => {
+    const session = createTuningSession({
+      referenceToneOutput: new RecordingToneOutput(),
+    })
+    await session.dispatch({ type: 'select-string', stringId: 'guitar-3' })
+    await session.dispatch({
+      type: 'select-tuning-preset',
+      tuningPresetId: 'half-step-down',
+    })
+    await session.dispatch({
+      type: 'select-tuning-mode',
+      tuningMode: 'chromatic',
+    })
+    await session.dispatch({
+      type: 'select-tuning-method',
+      tuningMethod: 'listen',
+    })
+
+    expect(session.getSnapshot()).toMatchObject({
+      instrument: { id: 'guitar' },
+      selectedString: { id: 'guitar-3' },
+      tuningMethod: 'listen',
+      tuningMode: 'chromatic',
+      tuningPreset: { id: 'half-step-down' },
+    })
+  })
+
+  it('restores the last Guitar Tuning Preset and Tuning Mode from preferences', async () => {
+    let savedPresetId: string | undefined
+    let savedTuningMode: 'guided' | 'chromatic' | undefined
+    const preferenceStore = {
+      loadAccidentalPreference: () => undefined,
+      loadGuitarTuningPresetId: () => savedPresetId,
+      loadTuningMode: () => savedTuningMode,
+      saveAccidentalPreference: () => undefined,
+      saveGuitarTuningPresetId: (presetId: string) => {
+        savedPresetId = presetId
+      },
+      saveTuningMode: (tuningMode: 'guided' | 'chromatic') => {
+        savedTuningMode = tuningMode
+      },
+    }
+    const session = createTuningSession({
+      preferenceStore,
+      referenceToneOutput: new RecordingToneOutput(),
+    })
+    await session.dispatch({
+      type: 'select-tuning-preset',
+      tuningPresetId: 'drop-d',
+    })
+    await session.dispatch({
+      type: 'select-tuning-mode',
+      tuningMode: 'chromatic',
+    })
+
+    const restored = createTuningSession({
+      preferenceStore,
+      referenceToneOutput: new RecordingToneOutput(),
+    })
+    expect(restored.getSnapshot()).toMatchObject({
+      tuningMode: 'chromatic',
+      tuningPreset: { id: 'drop-d' },
+    })
+  })
   it('starts Listen from a player command and reports the actual capture configuration', async () => {
     const microphoneInput = new ControlledMicrophoneInput()
     const session = createTuningSession({
@@ -243,11 +504,6 @@ describe('Tuning Session', () => {
       pitchEstimator: createMcleodPitchEstimator(),
       referenceToneOutput: new RecordingToneOutput(),
     })
-    await session.dispatch({
-      type: 'select-tuning-mode',
-      tuningMode: 'chromatic',
-    })
-
     const start = session.dispatch({ type: 'start-listening' })
     microphoneInput.finishStart()
     await start
@@ -257,8 +513,10 @@ describe('Tuning Session', () => {
       tuningMode: 'guided',
     })
 
-    microphoneInput.sendFrame(createSineFrame(110), 0)
-    await flushPitchEstimation()
+    for (const [index] of [0, 1, 2].entries()) {
+      microphoneInput.sendFrame(createSineFrame(110), index * 40)
+      await flushPitchEstimation()
+    }
 
     expect(session.getSnapshot()).toMatchObject({
       detectedPitch: { frequencyHz: expect.closeTo(110, 1) },

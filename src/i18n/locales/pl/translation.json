@@ -25,7 +25,9 @@
       },
       "preset": {
         "label": "Strój",
-        "standard": "Standardowy"
+        "standard": "Standardowy",
+        "drop-d": "Drop D",
+        "half-step-down": "Pół tonu niżej"
       },
       "method": {
         "label": "Metoda strojenia",
@@ -77,8 +79,11 @@
       "stopListening": "Zatrzymaj strojenie",
       "useReferenceTone": "Użyj dźwięku wzorcowego",
       "play": "Odtwórz {{noteName}}",
-      "stop": "Zatrzymaj {{noteName}}"
+      "stop": "Zatrzymaj {{noteName}}",
+      "lockString": "Zablokuj {{noteName}}",
+      "unlockString": "Odblokuj {{noteName}}"
     },
+    "guitarPreset": "Gitara sześciostrunowa · {{preset}}",
     "standardGuitar": "Gitara sześciostrunowa · Strój standardowy",
     "privacy": "Dźwięk jest przetwarzany na tym urządzeniu. Nie jest nagrywany ani wysyłany.",
     "diagnostics": {
