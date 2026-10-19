@@ -1568,3 +1568,14 @@
     transition: none;
   }
 }
+
+.diagnostics {
+  position: relative;
+  padding: 16px 24px;
+  max-width: 100%;
+}
+
+.diagnostics pre {
+  max-width: 100%;
+  overflow-x: auto;
+}

@@ -85,3 +85,9 @@ Network while loading both languages, using Listen and Reference Tone, opening
 settings and switching to privacy. All requests must be same-origin; check the
 console for CSP violations and confirm microphone capture stops on privacy navigation.
 Actual microphone behavior still requires a device and browser permission.
+
+## Pitch quality
+
+Run `npm run test:pitch` for the repeatable MPM/YIN synthetic comparison.
+See [quality validation and outstanding approval blockers](docs/pitch-quality.md)
+for report definitions, development diagnostics, recording rights, and device checks.

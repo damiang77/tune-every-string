@@ -20,7 +20,8 @@
     "typecheck": "tsc -b --pretty false",
     "i18n:generate": "node scripts/check-i18n.mjs --write",
     "i18n:check": "node scripts/check-i18n.mjs",
-    "build:production": "npm run build && node scripts/build-pages.mjs"
+    "build:production": "npm run build && node scripts/build-pages.mjs",
+    "test:pitch": "vitest run src/tuning/PitchQuality.test.ts --reporter=verbose"
   },
   "dependencies": {
     "@fontsource-variable/dm-sans": "5.3.0",

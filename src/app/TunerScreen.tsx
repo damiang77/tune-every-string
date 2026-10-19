@@ -648,6 +648,28 @@ export function TunerScreen({
           </aside>
         ) : null}
       </main>
+      {import.meta.env.DEV ? (
+        <details className={styles.diagnostics}>
+          <summary>Development pitch diagnostics</summary>
+          <pre>
+            {JSON.stringify(
+              {
+                lifecycle: snapshot.lifecycleStatus,
+                instrument: snapshot.instrument.id,
+                preset: snapshot.tuningPreset.id,
+                concertPitchHz: snapshot.concertPitchHz,
+                selectedString: snapshot.selectedString.id,
+                targetFrequencyHz: snapshot.targetPitch.frequencyHz,
+                pitchFeedback: snapshot.pitchFeedback,
+                detectedPitch: snapshot.detectedPitch,
+                ...snapshot.diagnostics,
+              },
+              null,
+              2,
+            )}
+          </pre>
+        </details>
+      ) : null}
     </div>
   )
 }
