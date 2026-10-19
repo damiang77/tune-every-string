@@ -1,3 +1,8 @@
 dist/
 coverage/
 package-lock.json
+
+# Vendored Impeccable skill files retain their upstream formatting.
+.agents/skills/impeccable/
+.github/skills/impeccable/
+.github/agents/impeccable-*.agent.md
