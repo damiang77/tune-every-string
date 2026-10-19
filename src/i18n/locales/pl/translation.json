@@ -7,7 +7,8 @@
     "tagline": "Spokojne miejsce do strojenia"
   },
   "navigation": {
-    "language": "Język"
+    "language": "Język",
+    "privacy": "Prywatność"
   },
   "tuner": {
     "eyebrow": "Stroik do gitary i basu",
@@ -16,7 +17,8 @@
     "concertPitch": "Strój koncertowy",
     "settings": {
       "open": "Ustawienia",
-      "close": "Zamknij ustawienia"
+      "close": "Zamknij ustawienia",
+      "showPrecisePitch": "Pokaż dokładną wysokość dźwięku"
     },
     "selection": {
       "instrument": {
@@ -66,7 +68,6 @@
       "tooLow": "Za nisko",
       "inTune": "Nastrojona",
       "tooHigh": "Za wysoko",
-      "detectedPitch": "{{frequency}} Hz · {{cents}} centów · {{result}}",
       "failed": "Błąd",
       "ready": "Wybierz strunę i posłuchaj jej docelowego dźwięku.",
       "readyChromatic": "Wybierz dźwięk i oktawę, a następnie posłuchaj dźwięku docelowego.",
@@ -110,5 +111,16 @@
       "frameTiming": "Czas ramki",
       "deviceSettings": "Zastosowane ustawienia urządzenia"
     }
+  },
+  "privacy": {
+    "title": "Prywatność",
+    "description": "Jak Tune Every String przetwarza dźwięk i pomiary wysokości dźwięku na Twoim urządzeniu.",
+    "audioHeading": "Dźwięk pozostaje na Twoim urządzeniu",
+    "audio": "Tune Every String przetwarza dźwięk z mikrofonu na Twoim urządzeniu, aby określić jego wysokość. Aplikacja nie nagrywa dźwięku ani nie wysyła dźwięku lub pomiarów jego wysokości na serwer. Dostęp do mikrofonu rozpoczyna się dopiero po uruchomieniu nasłuchu i kończy po zatrzymaniu strojenia lub opuszczeniu ekranu stroika.",
+    "dataHeading": "Bez analityki i kont",
+    "data": "Aplikacja nie korzysta z analityki ani nie tworzy kont. Preferencje strojenia i ustawienie dokładnej wysokości dźwięku zapisuje w pamięci lokalnej przeglądarki. Możesz je usunąć, czyszcząc dane tej witryny w przeglądarce.",
+    "hostingHeading": "Lokalne zasoby i hosting",
+    "hosting": "Czcionki, ikony i pozostałe elementy graficzne są udostępniane razem z aplikacją. Podczas działania aplikacja nie wysyła żądań do usług zewnętrznych. Dostawca hostingu otrzymuje zwykłe żądania stron i zasobów, które mogą zawierać Twój adres IP oraz informacje o przeglądarce.",
+    "back": "Wróć do stroika"
   }
 }

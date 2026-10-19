@@ -7,7 +7,8 @@
     "tagline": "A calm place to tune"
   },
   "navigation": {
-    "language": "Language"
+    "language": "Language",
+    "privacy": "Privacy"
   },
   "tuner": {
     "eyebrow": "Guitar and bass tuner",
@@ -16,7 +17,8 @@
     "concertPitch": "Concert pitch",
     "settings": {
       "open": "Settings",
-      "close": "Close settings"
+      "close": "Close settings",
+      "showPrecisePitch": "Show precise pitch"
     },
     "selection": {
       "instrument": {
@@ -66,7 +68,6 @@
       "tooLow": "Too Low",
       "inTune": "In Tune",
       "tooHigh": "Too High",
-      "detectedPitch": "{{frequency}} Hz · {{cents}} cents · {{result}}",
       "failed": "Failed",
       "ready": "Choose a String and hear its Target Pitch.",
       "readyChromatic": "Choose a note and octave, then hear the Target Pitch.",
@@ -110,5 +111,16 @@
       "frameTiming": "Frame timing",
       "deviceSettings": "Applied device settings"
     }
+  },
+  "privacy": {
+    "title": "Privacy",
+    "description": "How Tune Every String keeps audio and pitch measurements on your device.",
+    "audioHeading": "Audio stays on your device",
+    "audio": "Tune Every String processes microphone audio on your device to estimate pitch. It does not record audio or upload audio or pitch measurements. Microphone access starts only when you start Listen and stops when you stop tuning or leave the Tuner Screen.",
+    "dataHeading": "No analytics or accounts",
+    "data": "The application does not use analytics or create accounts. It stores tuning preferences and the precise-pitch setting in your browser’s local storage. You can remove them by clearing this site’s data in your browser.",
+    "hostingHeading": "Local assets and hosting",
+    "hosting": "Fonts, icons and other visual assets are served with the application. The application makes no runtime requests to third-party services. Your hosting provider receives normal page and asset requests, which may include your IP address and browser information.",
+    "back": "Back to tuner"
   }
 }

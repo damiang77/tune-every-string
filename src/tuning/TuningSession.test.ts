@@ -429,14 +429,14 @@ describe('Tuning Session', () => {
     microphoneInput.sendFrame([0.5, -0.5], 120)
     pitchEstimator.resolve({
       clarity: 0.99,
-      frequencyHz: 470,
+      frequencyHz: 471,
       signalLevel: 0.5,
     })
     await flushPitchEstimation()
 
     expect(session.getSnapshot()).toMatchObject({
       chromaticTarget: { noteName: 'B♭4' },
-      detectedPitch: { centsDeviation: expect.closeTo(6.34, 1) },
+      detectedPitch: { centsDeviation: expect.closeTo(10.02, 1) },
       pitchFeedback: 'too-high',
     })
   })
@@ -962,6 +962,36 @@ describe('Tuning Session', () => {
     microphoneInput.sendFrame(createSineFrame(110), 120)
     expect(session.getSnapshot().pitchFeedback).toBe('in-tune')
     await flushPitchEstimation()
+  })
+
+  it('treats a stable Guitar String within eight cents as In Tune', async () => {
+    const microphoneInput = new ControlledMicrophoneInput()
+    const pitchEstimator = new DeferredPitchEstimator()
+    const session = createTuningSession({
+      microphoneInput,
+      pitchEstimator,
+      referenceToneOutput: new RecordingToneOutput(),
+    })
+    const start = session.dispatch({ type: 'start-listening' })
+    microphoneInput.finishStart()
+    await start
+    await session.dispatch({ type: 'select-string', stringId: 'guitar-5' })
+
+    const sevenCentsSharpHz = 110 * 2 ** (7 / 1_200)
+    for (const capturedAtMs of [0, 40, 80]) {
+      microphoneInput.sendFrame([0.5, -0.5], capturedAtMs)
+      pitchEstimator.resolve({
+        clarity: 0.99,
+        frequencyHz: sevenCentsSharpHz,
+        signalLevel: 0.5,
+      })
+      await flushPitchEstimation()
+    }
+
+    expect(session.getSnapshot()).toMatchObject({
+      detectedPitch: { centsDeviation: expect.closeTo(7, 5) },
+      pitchFeedback: 'in-tune',
+    })
   })
 
   it('automatically selects the nearest String in Guided Listen', async () => {

@@ -11,13 +11,22 @@ import type {
 import type { TuningMethod, TuningSession } from '../tuning/TuningSession'
 import styles from './TunerScreen.module.css'
 
-const meterTicks = Array.from({ length: 21 }, (_, index) => index)
+const meterTicks = Array.from({ length: 11 }, (_, index) => index)
+const PRECISE_PITCH_PREFERENCE_KEY = 'tune-every-string:show-precise-pitch:v1'
+
+function loadPrecisePitchPreference() {
+  try {
+    return window.localStorage.getItem(PRECISE_PITCH_PREFERENCE_KEY) === 'true'
+  } catch {
+    return false
+  }
+}
 
 function SettingsIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24">
       <circle cx="12" cy="12" r="3" />
-      <path d="M12 2v3M12 19v3M4.9 4.9 7 7M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1" />
+      <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.09a2 2 0 0 1 1 1.74v.5a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z" />
     </svg>
   )
 }
@@ -47,6 +56,9 @@ export function TunerScreen({
 }) {
   const { t } = useTranslation()
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [showPrecisePitch, setShowPrecisePitch] = useState(
+    loadPrecisePitchPreference,
+  )
   const snapshot = useSyncExternalStore(session.subscribe, session.getSnapshot)
   const isPlaying = snapshot.referenceToneStatus === 'playing'
   const isListen = snapshot.tuningMethod === 'listen'
@@ -117,13 +129,7 @@ export function TunerScreen({
         ? t('tuner.status.starting')
         : isListening
           ? snapshot.detectedPitch
-            ? t('tuner.status.detectedPitch', {
-                cents: Math.abs(snapshot.detectedPitch.centsDeviation).toFixed(
-                  1,
-                ),
-                frequency: snapshot.detectedPitch.frequencyHz.toFixed(2),
-                result: pitchFeedbackLabel(),
-              })
+            ? pitchFeedbackLabel()
             : t('tuner.status.listening')
           : snapshot.referenceToneError
             ? t('tuner.status.error')
@@ -136,10 +142,6 @@ export function TunerScreen({
                 : snapshot.tuningMode === 'guided'
                   ? t('tuner.status.ready')
                   : t('tuner.status.readyChromatic')
-
-  const displayedFrequency = snapshot.detectedPitch?.frequencyHz
-    ? `${snapshot.detectedPitch.frequencyHz.toFixed(2)} Hz`
-    : `${snapshot.targetPitch.frequencyHz.toFixed(2)} Hz`
 
   function selectString(stringId: string) {
     void session.dispatch({ type: 'select-string', stringId })
@@ -173,6 +175,15 @@ export function TunerScreen({
       concertPitchHz <= 450
     ) {
       void session.dispatch({ type: 'set-concert-pitch', concertPitchHz })
+    }
+  }
+
+  function setPrecisePitchPreference(enabled: boolean) {
+    setShowPrecisePitch(enabled)
+    try {
+      window.localStorage.setItem(PRECISE_PITCH_PREFERENCE_KEY, String(enabled))
+    } catch {
+      // The Tuner Screen remains usable when storage is unavailable.
     }
   }
 
@@ -311,7 +322,15 @@ export function TunerScreen({
           <div className={styles.readout}>
             <div className={styles.noteBlock}>
               <strong data-target-note>{snapshot.targetPitch.noteName}</strong>
-              <span>{displayedFrequency}</span>
+              {showPrecisePitch ? (
+                <span className={styles.precisePitch}>
+                  {(
+                    snapshot.detectedPitch?.frequencyHz ??
+                    snapshot.targetPitch.frequencyHz
+                  ).toFixed(2)}{' '}
+                  Hz
+                </span>
+              ) : null}
             </div>
             <span
               aria-hidden="true"
@@ -332,7 +351,7 @@ export function TunerScreen({
             <div aria-hidden="true" className={styles.tickRow}>
               {meterTicks.map((tick) => (
                 <span
-                  className={tick === 10 ? styles.centerTick : ''}
+                  className={tick === 5 ? styles.centerTick : ''}
                   key={tick}
                 />
               ))}
@@ -381,7 +400,12 @@ export function TunerScreen({
               : t('tuner.selection.method.listen')}
           </button>
 
-          <p className={styles.privacy}>{t('tuner.privacy')}</p>
+          <p className={styles.privacy}>
+            {t('tuner.privacy')}{' '}
+            <Link to={locale === 'pl' ? '/pl/prywatnosc' : '/privacy'}>
+              {t('navigation.privacy')}
+            </Link>
+          </p>
         </section>
 
         {settingsOpen ? (
@@ -509,6 +533,18 @@ export function TunerScreen({
                 ))}
               </div>
             </div>
+
+            <label className={styles.toggleSetting}>
+              <span>{t('tuner.settings.showPrecisePitch')}</span>
+              <input
+                checked={showPrecisePitch}
+                onChange={(event) =>
+                  setPrecisePitchPreference(event.currentTarget.checked)
+                }
+                type="checkbox"
+              />
+              <i aria-hidden="true" />
+            </label>
 
             <label className={styles.numberSetting}>
               <span>{t('tuner.concertPitch')}</span>

@@ -50,10 +50,38 @@ English is the source language. Translation files live in `src/i18n/locales`. Ad
 
 ## Fonts
 
-Manrope is bundled locally through `@fontsource-variable/manrope`; the application does not fetch it from a third-party font service. Its SIL Open Font License is retained in [licenses/Manrope-OFL-1.1.txt](licenses/Manrope-OFL-1.1.txt).
+DM Sans is bundled locally through `@fontsource-variable/dm-sans`; the application does not fetch it from a third-party font service. Its SIL Open Font License is retained in [licenses/DM-Sans-OFL-1.1.txt](licenses/DM-Sans-OFL-1.1.txt).
 
 ## Source and contributions
 
 Copyright © 2026 Damian Garbera. All rights reserved. The source is public for transparency, but no license is granted to copy, modify, distribute, or create derivative works. See [LICENSE.md](LICENSE.md).
 
 Outside contributions are currently closed. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Privacy, localization review and production metadata
+
+Privacy is available at `/privacy` and `/pl/prywatnosc`. The language switch
+preserves the current page. Browser language preferences do not change routes.
+
+Run `npm run i18n:generate` after changing copy. `npm run i18n:status` checks
+key parity, non-empty translations, interpolation parity and syntax, and stale
+generated key types. Resource-derived i18next types remain the source for typed
+translation calls. Review every Polish string in [the review sheet](docs/polish-copy-review.md)
+and record a fluent reviewer's approval before production.
+
+For deployment, run `SITE_ORIGIN=https://your-production-host npm run build:production`
+with the real HTTPS origin, without a trailing slash. Deploy `dist` including
+its localized route directories and `_headers`. Configure directory index serving
+for all four routes; do not rewrite them all to the English root HTML. Hosts that
+do not support `_headers` must apply those headers in their own configuration.
+The production HTML also carries the CSP; `frame-ancestors` requires the HTTP header.
+The CSP permits same-origin assets, workers and connections, and inline style
+attributes for the moving tuner meter. It disallows external services and inline
+scripts. The development server uses its normal development policy.
+
+Production verification: inspect all four direct route responses and their title,
+description, canonical and alternate links. In a clean browser profile, inspect
+Network while loading both languages, using Listen and Reference Tone, opening
+settings and switching to privacy. All requests must be same-origin; check the
+console for CSP violations and confirm microphone capture stops on privacy navigation.
+Actual microphone behavior still requires a device and browser permission.

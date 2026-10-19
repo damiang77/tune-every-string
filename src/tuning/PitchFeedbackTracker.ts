@@ -14,7 +14,7 @@ export interface PitchTrackingResult {
   readonly pitchFeedback: PitchFeedback
 }
 
-const IN_TUNE_CENTS = 5
+const IN_TUNE_CENTS = 8
 const REQUIRED_STABLE_READINGS = 3
 const MIN_SIGNAL_LEVEL = 0.01
 

@@ -805,7 +805,7 @@
   position: relative;
   display: grid;
   width: 100%;
-  min-height: 210px;
+  min-height: 180px;
   grid-template-columns: minmax(72px, 1fr) auto minmax(72px, 1fr);
   align-items: center;
   column-gap: clamp(18px, 3.4vw, 44px);
@@ -827,11 +827,13 @@
   line-height: 0.86;
 }
 
-.noteBlock span {
-  margin-top: 12px;
-  font-size: clamp(1.35rem, 3vw, 2.2rem);
+.precisePitch {
+  min-height: 1.5em;
+  margin-top: 10px;
+  color: #51483f;
+  font-size: 1rem;
   font-variant-numeric: tabular-nums;
-  font-weight: 690;
+  font-weight: 700;
 }
 
 .cueLamp {
@@ -896,7 +898,7 @@
 .tickRow {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(21, 1fr);
+  grid-template-columns: repeat(11, 1fr);
   align-items: center;
   gap: 2px;
   padding: 18px 4px 14px;
@@ -1042,6 +1044,23 @@
   text-align: center;
 }
 
+.privacy a {
+  color: inherit;
+  font-weight: 650;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+
+.privacy a:hover {
+  color: var(--ink);
+}
+
+.privacy a:focus-visible {
+  border-radius: 2px;
+  outline: 2px solid var(--orange-dark);
+  outline-offset: 4px;
+}
+
 .settings {
   position: fixed;
   z-index: 30;
@@ -1144,6 +1163,67 @@
   background: var(--blue);
   box-shadow: 0 5px 12px rgb(21 90 157 / 20%);
   color: white;
+}
+
+.toggleSetting {
+  position: relative;
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 18px;
+  color: #504840;
+  cursor: pointer;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.toggleSetting input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.toggleSetting i {
+  position: relative;
+  width: 46px;
+  height: 26px;
+  flex: 0 0 auto;
+  border: 1px solid #bca68f;
+  border-radius: 999px;
+  background: #dfcfbd;
+  transition:
+    border-color 180ms cubic-bezier(0.16, 1, 0.3, 1),
+    background 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.toggleSetting i::after {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 2px 5px rgb(65 40 23 / 24%);
+  content: '';
+  transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.toggleSetting input:checked + i {
+  border-color: var(--blue);
+  background: var(--blue);
+}
+
+.toggleSetting input:checked + i::after {
+  transform: translateX(20px);
+}
+
+.toggleSetting input:focus-visible + i {
+  outline: 3px solid rgb(21 90 157 / 32%);
+  outline-offset: 3px;
 }
 
 .numberSetting > span:last-child {
@@ -1347,11 +1427,6 @@
 
   .noteBlock strong {
     font-size: clamp(4.5rem, 24vw, 6rem);
-  }
-
-  .noteBlock span {
-    margin-top: 9px;
-    font-size: clamp(1.25rem, 6vw, 1.6rem);
   }
 
   .cueLamp {

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup } from '@testing-library/react'
@@ -11,6 +11,10 @@ import {
   type MicrophoneStartOptions,
   type ReferenceToneOutput,
 } from '../tuning/TuningSession'
+import type {
+  PitchEstimation,
+  PitchEstimator,
+} from '../tuning/McleodPitchEstimator'
 
 class ControlledMicrophoneInput implements MicrophoneInput {
   readonly starts: MicrophoneStartOptions[] = []
@@ -42,6 +46,28 @@ class ControlledMicrophoneInput implements MicrophoneInput {
 
   interrupt() {
     this.starts.at(-1)?.onInterruption('audio-suspended')
+  }
+
+  sendFrame(samples: number[], capturedAtMs: number) {
+    this.starts.at(-1)?.onFrame({
+      capturedAtMs,
+      samples: Float32Array.from(samples),
+    })
+  }
+}
+
+class DeferredPitchEstimator implements PitchEstimator {
+  private finish: ((estimation: PitchEstimation) => void) | undefined
+
+  estimate() {
+    return new Promise<PitchEstimation>((resolve) => {
+      this.finish = resolve
+    })
+  }
+
+  resolve(estimation: PitchEstimation) {
+    this.finish?.(estimation)
+    this.finish = undefined
   }
 }
 
@@ -94,6 +120,7 @@ describe('application routes', () => {
         'Audio is processed on this device. It is not recorded or uploaded.',
       )[0],
     ).toBeVisible()
+    expect(screen.queryByText(/^\d+(?:\.\d+)? Hz$/)).not.toBeInTheDocument()
     expect(document.documentElement).toHaveAttribute('lang', 'en')
   })
 
@@ -184,6 +211,49 @@ describe('application routes', () => {
     expect(microphoneInput.starts[1]?.deviceId).toBe('usb')
   })
 
+  it('keeps detected feedback visible without moving the tuning controls', async () => {
+    const user = userEvent.setup()
+    const microphoneInput = new ControlledMicrophoneInput()
+    const pitchEstimator = new DeferredPitchEstimator()
+    const session = createTuningSession({
+      initialTuningMethod: 'listen',
+      microphoneInput,
+      pitchEstimator,
+      referenceToneOutput: new RecordingToneOutput(),
+    })
+    render(<App session={session} />)
+
+    await user.click(screen.getByRole('button', { name: 'Start tuning' }))
+    microphoneInput.finishStart()
+    await screen.findByText('Listening for a clear note.')
+    microphoneInput.sendFrame([0.5, -0.5], 0)
+    pitchEstimator.resolve({
+      clarity: 0.99,
+      frequencyHz: 82.407,
+      signalLevel: 0.5,
+    })
+
+    await vi.waitFor(() =>
+      expect(
+        within(screen.getByRole('status')).getByText('Acquiring'),
+      ).toBeVisible(),
+    )
+    expect(screen.getByRole('button', { name: 'Stop tuning' })).toBeVisible()
+  })
+
+  it('shows precise pitch only when enabled in Settings', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    expect(screen.queryByText('82.41 Hz')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Settings' }))
+    await user.click(
+      screen.getByRole('checkbox', { name: 'Show precise pitch' }),
+    )
+
+    expect(screen.getByText('82.41 Hz')).toBeVisible()
+  })
+
   it('offers a Resume tuning action after an audio interruption', async () => {
     const user = userEvent.setup()
     const microphoneInput = new ControlledMicrophoneInput()
@@ -234,7 +304,7 @@ describe('application routes', () => {
     expect(
       screen.getByText('D♭5', { selector: '[data-target-note]' }),
     ).toBeVisible()
-    expect(screen.getByText('556.89 Hz')).toBeVisible()
+    expect(screen.queryByText('556.89 Hz')).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Play D♭5' }))
     expect(referenceToneOutput.playedFrequencies.at(-1)).toBeCloseTo(556.89, 2)
