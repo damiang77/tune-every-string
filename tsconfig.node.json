@@ -8,5 +8,10 @@
     "strict": true,
     "noEmit": true
   },
-  "include": ["i18next.config.ts", "vite.config.ts"]
+  "include": [
+    "i18next.config.ts",
+    "vite.config.ts",
+    "playwright.config.ts",
+    "e2e/**/*.ts"
+  ]
 }

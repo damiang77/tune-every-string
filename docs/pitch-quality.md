@@ -43,7 +43,7 @@ than establishing a real instrument's sustained-note error distribution.
 
 Validation also passed lint, type checking, bilingual checks and the production
 build with a test HTTPS origin. Changed files pass Prettier; the repository-wide
-format check remains blocked by 73 existing skill/plugin files. Browser checks
+format check now passes after the vendored skill formatting exclusions. Browser checks
 confirmed pointer and keyboard access to diagnostics at desktop and 390px widths,
 with no mobile horizontal overflow. The production JavaScript excludes the
 diagnostic display and comparison estimator.
@@ -70,5 +70,21 @@ labels are developer identifiers, rather than translated product copy.
 - **BLOCKED: observed playing conditions.** Synthetic additive noise, clipping
   and harmonics do not establish accuracy in an actual room or with an interface.
 
-Issue #13 must remain open until recordings and supported-device results are
-reviewed. No audio needs to leave a player's device during normal application use.
+After review, #13 was closed at the maintainer's request. Remaining recordings,
+sustained-note accuracy and supported-device latency acceptance are tracked in
+[issue #26](https://github.com/damiang77/tune-every-string/issues/26) and remain
+release blockers for #14. Closing #13 does not certify real-device pitch quality. No audio needs to leave a player's device during normal application use.
+
+## Recorded validation tooling — issue #26
+
+The [recorded validation protocol](recorded-pitch-validation.md) documents the
+implemented PCM16 WAV/manifest validation and MPM/YIN replay through
+`TuningSession`. Reports retain every sustained frame, raw and published error
+distributions, clarity, misses and false String/octave selections. Explicit
+recorded runs require both Guitar and Bass and fail on quality violations.
+The ordinary suite's generated PCM validates the harness only; external
+recording acceptance is skipped without supplied inputs. Physical-device
+latency is not inferred from replay and remains null in its reports.
+
+The recording, physical-device and observed-playing-condition blockers above
+remain open. No recorded-instrument or device approval is claimed by this work.

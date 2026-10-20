@@ -31,22 +31,6 @@ function SettingsIcon() {
   )
 }
 
-function GuitarPick({ className }: { className: string | undefined }) {
-  return (
-    <svg className={`${styles.pick} ${className ?? ''}`} viewBox="0 0 100 112">
-      <path
-        className={styles.pickBody}
-        d="M50 106C43 106 12 61 8 33 5 16 17 7 33 5c11-2 23-2 34 0 16 2 28 11 25 28-4 28-35 73-42 73Z"
-      />
-      <path
-        className={styles.pickHighlight}
-        d="M18 33c-1-11 7-17 18-19 13-2 27-2 39 2"
-      />
-      <path className={styles.pickMark} d="m37 43 26-13M41 54l21-11" />
-    </svg>
-  )
-}
-
 export function TunerScreen({
   locale,
   session,
@@ -232,36 +216,7 @@ export function TunerScreen({
       </header>
 
       <main className={styles.main}>
-        <div aria-hidden="true" className={styles.stageDecor}>
-          <span className={styles.case} />
-          <span className={styles.patchPanel}>
-            <i />
-            <i />
-            <i />
-            <i />
-          </span>
-          <span className={styles.notePaper} />
-          <span className={styles.backstagePass}>
-            <i className={styles.passClip} />
-            <i className={styles.passHeader} />
-            <i className={styles.passTitle} />
-            <i className={styles.passLine} />
-            <i className={styles.passLineShort} />
-            <i className={styles.passAccess} />
-          </span>
-          <span className={styles.pedal}>
-            <i />
-            <i />
-            <i />
-          </span>
-          <GuitarPick className={styles.pickCoral} />
-          <GuitarPick className={styles.pickBlue} />
-          <GuitarPick className={styles.pickGreen} />
-        </div>
-
         <section className={styles.setlist} aria-labelledby="tuner-heading">
-          <span aria-hidden="true" className={styles.clip} />
-
           <h2 className={styles.srOnly} id="tuner-heading">
             {t('tuner.heading')}
           </h2>

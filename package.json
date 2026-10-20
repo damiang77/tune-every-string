@@ -21,7 +21,10 @@
     "i18n:generate": "node scripts/check-i18n.mjs --write",
     "i18n:check": "node scripts/check-i18n.mjs",
     "build:production": "npm run build && node scripts/build-pages.mjs",
-    "test:pitch": "vitest run src/tuning/PitchQuality.test.ts --reporter=verbose"
+    "test:pitch": "vitest run src/tuning/PitchQuality.test.ts src/tuning/RecordedPitchQuality.test.ts --reporter=verbose",
+    "test:e2e": "playwright test",
+    "check:bundle": "node scripts/check-bundle.mjs",
+    "test:pitch:recorded": "node scripts/run-recorded-pitch.mjs"
   },
   "dependencies": {
     "@fontsource-variable/dm-sans": "5.3.0",
@@ -32,10 +35,13 @@
     "react-router-dom": "7.18.4"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
     "@eslint/js": "10.0.1",
+    "@playwright/test": "1.64.1",
     "@testing-library/jest-dom": "7.0.1",
     "@testing-library/react": "16.3.3",
     "@testing-library/user-event": "14.6.8",
+    "@types/node": "24.19.2",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.2",

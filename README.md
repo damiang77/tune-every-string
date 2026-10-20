@@ -91,3 +91,15 @@ Actual microphone behavior still requires a device and browser permission.
 Run `npm run test:pitch` for the repeatable MPM/YIN synthetic comparison.
 See [quality validation and outstanding approval blockers](docs/pitch-quality.md)
 for report definitions, development diagnostics, recording rights, and device checks.
+
+## Release readiness
+
+Run `npm run test:e2e` for production browser and accessibility checks (install
+engines with `npx playwright install --with-deps chromium firefox webkit` first).
+Run `npm run check:bundle` after building to enforce the JavaScript budget.
+See [the release checklist](docs/release-readiness.md) for coverage, reproducible
+performance conditions, supported browsers and outstanding human approvals.
+
+Cloudflare Workers Static Assets preview and production setup is documented in
+[the deployment guide](docs/deployment.md), including credentials, release gates
+and deployed browser checks.

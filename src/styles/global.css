@@ -31,7 +31,7 @@
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 
-  --color-canvas: #fafadf;
+  --color-canvas: #eef0f2;
   --color-surface: #ffffff;
   --color-surface-raised: #ffffff;
   --color-surface-soft: #fffde7;
@@ -72,8 +72,6 @@ body {
   min-height: 100vh;
   margin: 0;
   background-color: var(--color-canvas);
-  background-image: radial-gradient(#111111 0.7px, transparent 0.7px);
-  background-size: 22px 22px;
 }
 
 button,

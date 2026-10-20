@@ -14,8 +14,9 @@ selection boundaries and hysteresis separately.
 
 ## Recorded instrument fixtures: BLOCKED
 
-Synthetic signals do not establish real Guitar or Bass performance. Before
-closing #13, add rights-cleared recordings for both Instruments. Each recording
+Synthetic signals do not establish real Guitar or Bass performance. Follow-up
+[issue #26](https://github.com/damiang77/tune-every-string/issues/26) requires
+rights-cleared recordings for both Instruments before release approval. Each recording
 must have a manifest containing:
 
 - File path and SHA-256 checksum; uncompressed mono PCM WAV recommended.
@@ -28,3 +29,14 @@ must have a manifest containing:
 
 Do not label a synthesized pluck as a real-instrument recording. Do not add
 third-party recordings based only on an attribution or a downloadable URL.
+
+## Offline recorded replay
+
+The parser accepts mono PCM16 RIFF WAVs with verified SHA-256 checksums and a
+required rights/reference manifest. See the [recorded validation protocol](../../../docs/recorded-pitch-validation.md)
+for the exact manifest, command, report definitions and device worksheet.
+Run `npm run test:pitch:recorded -- /absolute/manifest.json /tmp/pitch-report.json`.
+The ordinary pitch suite checks the replay harness using clearly labeled
+synthetic test data; its external-recording case is skipped until a manifest is
+provided. This skip is not instrument acceptance. No real recordings are
+currently included, and actual device latency remains unmeasured.

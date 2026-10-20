@@ -5,3 +5,8 @@ coverage/
 *.local
 *.tsbuildinfo
 .playwright-mcp
+playwright-report/
+test-results/
+
+.wrangler/
+.dev.vars*

@@ -48,3 +48,115 @@ jobs:
         run: npm run build:production
         env:
           SITE_ORIGIN: https://example.test
+
+      - name: Validate static Worker configuration
+        run: npx --yes wrangler@4.151.2 deploy --dry-run
+
+      - name: Check compressed JavaScript budget
+        run: npm run check:bundle
+
+      - name: Install test browsers
+        run: npx playwright install --with-deps chromium firefox webkit
+
+      - name: Run production browser checks
+        run: npm run test:e2e
+
+      - name: Retain browser failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-results
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
+  deploy:
+    name: Deploy Cloudflare Worker
+    needs: quality
+    if: >-
+      vars.CLOUDFLARE_DEPLOYMENTS_ENABLED == 'true' &&
+      ((github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.full_name == github.repository) ||
+       (github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+        vars.PRODUCTION_RELEASE_APPROVED == 'true'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      deployments: write
+    concurrency:
+      group: worker-${{ github.event.pull_request.number || 'production' }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+    environment:
+      name: ${{ github.event_name == 'pull_request' && 'preview' || 'production' }}
+      url: ${{ steps.target.outputs.origin }}
+    env:
+      PREVIEW_ALIAS: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || '' }}
+    steps:
+      - name: Check out verified revision
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Select deployment target
+        id: target
+        shell: bash
+        run: |
+          if [[ -z "$PREVIEW_ALIAS" ]]; then
+            origin="https://tune-every-string.damiangarbera.workers.dev"
+            command="deploy"
+          else
+            origin="https://${PREVIEW_ALIAS}-tune-every-string.damiangarbera.workers.dev"
+            command="versions upload --preview-alias=$PREVIEW_ALIAS"
+          fi
+          echo "origin=$origin" >> "$GITHUB_OUTPUT"
+          echo "command=$command" >> "$GITHUB_OUTPUT"
+          echo "METADATA_ORIGIN=$origin" >> "$GITHUB_ENV"
+          echo "DEPLOYED_ORIGIN=$origin" >> "$GITHUB_ENV"
+
+      - name: Build for deployment origin
+        run: |
+          SITE_ORIGIN="$METADATA_ORIGIN" npm run build:production
+          npm run check:bundle
+
+      - name: Publish static assets
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: '4.151.2'
+          command: ${{ steps.target.outputs.command }}
+
+      - name: Record candidate links
+        env:
+          DEPLOYMENT_URL: ${{ steps.target.outputs.origin }}
+        run: |
+          echo "Commit: $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+          echo "[Candidate]($DEPLOYMENT_URL) · [Privacy]($DEPLOYMENT_URL/privacy) · [Polish privacy]($DEPLOYMENT_URL/pl/prywatnosc)" >> "$GITHUB_STEP_SUMMARY"
+          echo "[Copyright]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/blob/$GITHUB_SHA/LICENSE.md) · [Release approvals]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/issues/27)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Install smoke-test browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Verify deployed candidate
+        run: |
+          test -n "$DEPLOYED_ORIGIN"
+          npx playwright test --project=chromium
+
+      - name: Retain deployment browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployed-browser-results-${{ github.event.pull_request.number || 'production' }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
