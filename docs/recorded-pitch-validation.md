@@ -1,8 +1,10 @@
 # Recorded pitch and physical-device validation — issue #26
 
-Status: **BLOCKED pending rights-cleared recordings and actual device runs.**
-The replay harness is implemented; its generated test signals validate the
-harness, not instrument accuracy. Nothing in this document approves release.
+Status: **PARTIAL: initial CC0 recordings available; calibrated references, full
+coverage and actual device runs remain blocked.**
+The replay harness and eleven bundled recordings are implemented. Generated
+test signals validate the harness; the bundled recordings add regression
+evidence with documented limitations. See [current results](pitch-quality.md#recorded-input-evidence--2026-10-20). Nothing in this document approves release.
 Normal application use still stores and uploads no audio or pitch history.
 The offline tooling is imported by tests only.
 
@@ -36,6 +38,9 @@ below are a format example, **not recording evidence**):
     "redistributionTerms": "Full applicable license/redistribution text",
     "redistributionPermission": "Explicit permission to redistribute in this public all-rights-reserved repository; evidence reference",
     "referenceMethod": "Independent calibrated measurement method, reference frequency uncertainty and interval stability",
+    "referenceKind": "independent-measurement",
+    "referenceMaximumDeviationCents": 0.2,
+    "referenceEvidence": "Calibration and interval measurement evidence location",
     "conditions": "Hardware/interface, OS/browser if used, applied audio settings, room/amplification and conversion details",
     "instrumentId": "guitar",
     "presetId": "standard",
@@ -52,6 +57,12 @@ below are a format example, **not recording evidence**):
 
 Use `shasum -a 256 recording.wav` to obtain each checksum. Metadata validation
 checks presence and shape; a human must verify rights and reference evidence.
+`referenceKind` may be `independent-measurement` or `offline-spectral`. The strict
+command rejects unqualified references even when the numerical comparison passes.
+Missing evidence/stability, computational references and reference variation over
+three cents appear in `referenceWarnings` and `acceptanceBlockers`.
+`accuracyQualified` means the declared reference metadata passes these checks;
+it does not replace human verification or physical-device approval.
 Do not submit confidential permission documents or identifying incidental audio.
 
 ## Replay and review failures
@@ -125,4 +136,6 @@ The note displayed while idle is a Target Pitch, not proof of detection.
 Require sustained absolute error ≤3 cents p95; investigate and document Guitar
 latency >150 ms or Bass latency >200 ms. Retain every failed take, including
 misses, rather than reporting only successes. Obtain the human approvals in
-[release readiness](release-readiness.md) before marking #26 or #14 complete.
+[release readiness](release-readiness.md) before approving production under #27.
+The maintainer requested closure of #26 after review; its remaining acceptance
+is tracked in #27 and was not waived.

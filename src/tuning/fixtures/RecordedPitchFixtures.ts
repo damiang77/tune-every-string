@@ -13,6 +13,9 @@ export interface RecordedPitchFixture {
   redistributionTerms: string
   redistributionPermission: string
   referenceMethod: string
+  referenceKind?: 'independent-measurement' | 'offline-spectral'
+  referenceMaximumDeviationCents?: number
+  referenceEvidence?: string
   conditions: string
   instrumentId: string
   presetId: string
@@ -68,6 +71,25 @@ export function parseRecordedManifest(input: unknown): RecordedPitchFixture[] {
       !/^[a-f0-9]{64}$/.test(entry.sha256)
     )
       throw new Error('Invalid recording SHA-256')
+    if (
+      entry.referenceKind !== undefined &&
+      entry.referenceKind !== 'independent-measurement' &&
+      entry.referenceKind !== 'offline-spectral'
+    )
+      throw new Error('Unknown reference kind')
+    if (
+      entry.referenceMaximumDeviationCents !== undefined &&
+      (typeof entry.referenceMaximumDeviationCents !== 'number' ||
+        !Number.isFinite(entry.referenceMaximumDeviationCents) ||
+        entry.referenceMaximumDeviationCents < 0)
+    )
+      throw new Error('Invalid reference stability')
+    if (
+      entry.referenceEvidence !== undefined &&
+      (typeof entry.referenceEvidence !== 'string' ||
+        !entry.referenceEvidence.trim())
+    )
+      throw new Error('Invalid reference evidence')
     const fixture = entry as unknown as RecordedPitchFixture
     if (ids.has(fixture.id))
       throw new Error(`Duplicate recording: ${fixture.id}`)

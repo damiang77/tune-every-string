@@ -70,8 +70,24 @@ export function summarizeRecordedFrames(
   if (missed) failures.push('Sustained frames missed')
   if (falseStrings) failures.push('False sustained String selections')
   if (falseOctaves) failures.push('False sustained octave selections')
+  const referenceWarnings: string[] = []
+  if (metadata.referenceKind !== 'independent-measurement')
+    referenceWarnings.push(
+      'No independent measured reference; cents describe a comparison, not certified accuracy',
+    )
+  if (!metadata.referenceEvidence?.trim())
+    referenceWarnings.push('Reference measurement evidence missing')
+  if (metadata.referenceMaximumDeviationCents === undefined)
+    referenceWarnings.push('Reference stability not supplied')
+  else if (metadata.referenceMaximumDeviationCents > 3)
+    referenceWarnings.push(
+      'Reference varies by more than 3 cents; a fixed frequency cannot qualify this interval',
+    )
   return {
     fixtureId: metadata.id,
+    accuracyQualified: referenceWarnings.length === 0,
+    referenceWarnings,
+    acceptanceBlockers: [...referenceWarnings, ...failures],
     sustainedFrames: sustained.length,
     rawAbsoluteCents: rawCents,
     publishedAbsoluteCents: publishedCents,

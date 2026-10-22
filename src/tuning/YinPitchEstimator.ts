@@ -41,24 +41,36 @@ export function createYinPitchEstimator(): PitchEstimator {
         cumulative += sum
         difference[lag] = cumulative ? (sum * lag) / cumulative : 1
       }
+      const candidates: number[] = []
       for (let lag = minimumLag; lag < maximumLag; lag += 1) {
         if (difference[lag]! >= 0.15) continue
         while (lag + 1 < maximumLag && difference[lag + 1]! < difference[lag]!)
           lag += 1
-        const center = difference[lag]!
-        const left = difference[lag - 1]!
-        const right = difference[lag + 1]!
-        const curvature = left - 2 * center + right
-        const period = lag + (curvature ? (left - right) / (2 * curvature) : 0)
-        const frequencyHz = sampleRateHz / period
-        if (
-          frequencyHz < range.minimumFrequencyHz ||
-          frequencyHz > range.maximumFrequencyHz
-        )
-          return empty
-        return { clarity: 1 - center, frequencyHz, signalLevel }
+        candidates.push(lag)
       }
-      return empty
+      // A strong overtone can create a shallow half-period dip below YIN's
+      // absolute threshold. Prefer the earliest dip whose clarity is also
+      // within 7% of the strongest candidate, matching MPM's relative gate.
+      const strongestClarity = Math.max(
+        0,
+        ...candidates.map((lag) => 1 - difference[lag]!),
+      )
+      const lag = candidates.find(
+        (candidate) => 1 - difference[candidate]! >= strongestClarity * 0.93,
+      )
+      if (lag === undefined) return empty
+      const center = difference[lag]!
+      const left = difference[lag - 1]!
+      const right = difference[lag + 1]!
+      const curvature = left - 2 * center + right
+      const period = lag + (curvature ? (left - right) / (2 * curvature) : 0)
+      const frequencyHz = sampleRateHz / period
+      if (
+        frequencyHz < range.minimumFrequencyHz ||
+        frequencyHz > range.maximumFrequencyHz
+      )
+        return empty
+      return { clarity: 1 - center, frequencyHz, signalLevel }
     },
   }
 }

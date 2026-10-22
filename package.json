@@ -21,10 +21,11 @@
     "i18n:generate": "node scripts/check-i18n.mjs --write",
     "i18n:check": "node scripts/check-i18n.mjs",
     "build:production": "npm run build && node scripts/build-pages.mjs",
-    "test:pitch": "vitest run src/tuning/PitchQuality.test.ts src/tuning/RecordedPitchQuality.test.ts --reporter=verbose",
+    "test:pitch": "vitest run src/tuning/PitchQuality.test.ts src/tuning/RecordedPitchQuality.test.ts src/tuning/BundledRecordedPitchQuality.test.ts src/tuning/IndependentSpectralReference.test.ts src/tuning/RecordedPitchRegression.test.ts --reporter=verbose",
     "test:e2e": "playwright test",
     "check:bundle": "node scripts/check-bundle.mjs",
-    "test:pitch:recorded": "node scripts/run-recorded-pitch.mjs"
+    "test:pitch:recorded": "node scripts/run-recorded-pitch.mjs",
+    "pitch:prepare-recordings": "node scripts/prepare-pitch-recordings.mjs"
   },
   "dependencies": {
     "@fontsource-variable/dm-sans": "5.3.0",

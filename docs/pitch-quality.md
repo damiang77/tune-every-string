@@ -5,6 +5,9 @@ The comparison YIN implementation follows the cumulative mean normalized
 squared difference, first threshold dip (0.15), and parabolic interpolation
 from [de Cheveigné and Kawahara (2002)](https://doi.org/10.1121/1.1458024).
 MPM remains the production estimator. YIN and fixtures are imported only by tests.
+YIN additionally rejects a threshold dip when its clarity is more than 7% below
+the strongest candidate, preventing a strong overtone from winning over a much
+clearer fundamental.
 
 The report includes final-frame absolute cents error at the 95th percentile, earliest
 published pitch in simulated signal time, minimum published clarity, missed
@@ -59,8 +62,10 @@ labels are developer identifiers, rather than translated product copy.
 
 ## Approval blockers
 
-- **BLOCKED: real recordings.** No rights-cleared Guitar or Bass recordings
-  were supplied. See [fixture requirements](../src/tuning/fixtures/README.md).
+- **PARTIAL: real recordings.** Eleven CC0 Guitar/Bass excerpts are now bundled
+  with checksums and spectral references. Preset coverage and physical calibration
+  remain incomplete; the strict comparison reports failures. See
+  [recorded evidence](#recorded-input-evidence--2026-10-20).
 - **BLOCKED: device measurements.** Run on representative iPhone/Safari,
   Android/Chrome, macOS/Safari and Chrome, Windows/Edge, and desktop Firefox.
   Record actual hardware, OS/browser versions, audio settings, Instrument,
@@ -72,8 +77,9 @@ labels are developer identifiers, rather than translated product copy.
 
 After review, #13 was closed at the maintainer's request. Remaining recordings,
 sustained-note accuracy and supported-device latency acceptance are tracked in
-[issue #26](https://github.com/damiang77/tune-every-string/issues/26) and remain
-release blockers for #14. Closing #13 does not certify real-device pitch quality. No audio needs to leave a player's device during normal application use.
+[issue #27](https://github.com/damiang77/tune-every-string/issues/27) after
+#26 was closed at the maintainer's request following review. They remain release
+blockers; neither closure certifies real-device pitch quality. Closing #13 does not certify real-device pitch quality. No audio needs to leave a player's device during normal application use.
 
 ## Recorded validation tooling — issue #26
 
@@ -82,9 +88,156 @@ implemented PCM16 WAV/manifest validation and MPM/YIN replay through
 `TuningSession`. Reports retain every sustained frame, raw and published error
 distributions, clarity, misses and false String/octave selections. Explicit
 recorded runs require both Guitar and Bass and fail on quality violations.
-The ordinary suite's generated PCM validates the harness only; external
-recording acceptance is skipped without supplied inputs. Physical-device
+The ordinary suite's generated PCM validates the harness only; the bundled real-recording regression suite also runs by default. The external
+strict acceptance command requires an explicit manifest and retains its failures. Physical-device
 latency is not inferred from replay and remains null in its reports.
 
 The recording, physical-device and observed-playing-condition blockers above
 remain open. No recorded-instrument or device approval is claimed by this work.
+
+## Recorded-input evidence — 2026-10-20
+
+Imported eight Guitar and three Bass notes from CC0 FreePats sources.
+The table below preserves the before-fix baseline; see the correction report below
+for current YIN results. See
+[provenance audit](pitch-recording-sources.md), [corpus README](../src/tuning/fixtures/recorded/README.md),
+[manifest](../src/tuning/fixtures/recorded/manifest.json) and the
+[full frame-level report](evidence/pitch-recorded-2026-10-20.json).
+All excerpts retain the original 44.1 kHz rate and first two seconds; no pitch
+shifting, looping, gain adjustment or synthetic completion is used.
+
+A separate Hann-windowed DFT peak search measures the fundamental independently
+of MPM/YIN in four 0.5-second blocks. The median supplies a **computational
+file-clock reference**, not a calibrated physical frequency. The
+[block measurements](../src/tuning/fixtures/recorded/references.json) expose
+pitch variation. Block spread is a stability observation, not a confidence
+interval or calibrated uncertainty. References do not certify device accuracy.
+The fixed sustained evaluation interval is 0.4–1.5 seconds for every excerpt.
+
+| Input      | MPM published p95 cents | YIN published p95 cents | Reference max block deviation cents |
+| ---------- | ----------------------: | ----------------------: | ----------------------------------: |
+| Guitar D2  |                   2.452 |                   2.428 |                               0.324 |
+| Guitar D#2 |                   1.779 |                   1.799 |                               0.744 |
+| Guitar E2  |                   1.171 |                   1.122 |                               0.559 |
+| Guitar A2  |                   4.484 |                1199.892 |                              31.396 |
+| Guitar D3  |                   3.675 |                   3.649 |                               0.871 |
+| Guitar G3  |                   8.045 |                   8.146 |                               6.643 |
+| Guitar B3  |                   7.864 |                   7.936 |                               3.025 |
+| Guitar E4  |                   1.646 |                   1.656 |                               1.830 |
+| Bass E1    |                   6.588 |                   6.637 |                               2.776 |
+| Bass A1    |                   9.493 |                   9.576 |                               7.398 |
+| Bass D2    |                   2.135 |                   2.186 |                               0.571 |
+
+There were no sustained missed detections or wrong String selections in these
+22 comparisons. MPM had no octave errors. The baseline YIN had two octave-error frames on
+Guitar A2, now fixed as described below. No aggregate pass is claimed: six inputs exceed the three-cent
+comparison gate for both estimators, and four references vary by more than
+three cents between blocks. Scalar-reference drift and estimator bias cannot
+be separated by this report alone. Investigate the stable-reference D3 and
+Bass E1 differences and YIN's A2 octave errors; obtain calibrated/time-resolved
+references before attributing every remaining difference to the estimators.
+MPM remains the production estimator; this work changes no tuning behavior.
+
+The ordinary bundled regression tests assert no misses/wrong String selections,
+no MPM octave errors, and the three-cent gate on the five currently passing
+inputs. They print all eleven inputs, including challenge failures, and do not
+approve release. Run the strict all-input comparison with a fresh report path:
+
+```bash
+npm run test:pitch:recorded -- src/tuning/fixtures/recorded/manifest.json /tmp/pitch-recorded-report.json
+```
+
+This command currently **exits 1**, retaining every report before asserting.
+Do not reduce the acceptance gate or omit failures to turn it green. The original
+external recording case in the ordinary suite stays skipped without an explicit
+manifest; bundled recorded regression tests run independently of that skip.
+Physical capture/worker latency, supported device results, original String
+identity and complete preset coverage remain unmeasured. These requirements
+remain open under #27 after the maintainer requested closure of #26.
+
+Local verification on Node 24.15.0 / npm 11.12.1: 115 ordinary tests passed
+(one explicit external-manifest case skipped), and 16 dedicated pitch tests
+passed with the same skip. The bundled real-recording tests run in both commands.
+Lint, strict type checking, formatting, production build and bundle checks passed.
+All emitted JavaScript remains 111,017 gzip bytes; recordings and reference
+analysis are absent from production output. The strict recorded command failed
+as described above. No physical microphone/device run was performed.
+
+## Recorded-note correction — 2026-10-20
+
+The focused command `npx vitest run src/tuning/RecordedPitchRegression.test.ts`
+reproduced two false octave frames on Guitar A2 before the fix and passes after
+it. In the failing frames, the normalized difference dip at approximately half
+the fundamental period was 0.141/0.148, just under YIN's 0.15 threshold. The
+fundamental-period dip was much deeper at 0.0022/0.0026. YIN now chooses the
+earliest threshold dip whose clarity is within 7% of the strongest candidate,
+using the same relative-clarity rule as MPM. This fixes the octave mistake
+without selecting later period multiples on the clean/synthetic cases.
+
+The [after-fix frame-level report](evidence/pitch-recorded-2026-10-20-after-fix.json)
+records **zero sustained octave errors, wrong String selections or misses for
+both estimators** on all eleven recordings. Guitar A2's YIN published comparison
+p95 drops from 1199.892 cents to 4.575 cents. The remaining
+three-cent comparison failures persist; they have not been hidden or waived.
+
+A diagnostic spectral probe found non-integer partial relationships. For example,
+Guitar D3's fundamental near 146.92 Hz and second partial divided by two near
+147.22 Hz differ; Bass E1's equivalent values near 41.05 Hz and 41.22 Hz differ.
+Consequently whole-waveform periodicity and a single long-window fundamental
+peak can legitimately disagree. Drifting/inharmonic, uncalibrated recordings
+cannot establish which result satisfies physical instrument accuracy. No MPM
+production change is justified by this comparison alone.
+
+The report now distinguishes numerical `failures` from `referenceWarnings` and
+combines both in `acceptanceBlockers`. It labels all bundled computational
+references `accuracyQualified: false`. The strict recorded command continues to
+exit 1 for missing independent measured references as well as numerical failures.
+A green numerical result alone can no longer approve an unqualified reference.
+Manifest authors must supply reference kind, measured stability and evidence;
+human review must still verify those claims. Actual hardware latency remains null.
+
+Correction verification: 117 ordinary tests and 18 focused pitch tests pass;
+one explicit external-manifest case is skipped in each ordinary invocation.
+The strict external-manifest run was executed separately and intentionally fails
+for unqualified references, saving the after-fix report. Formatting, lint, type
+checking, production build and bundle budget pass. All production JavaScript
+remains 111,017 gzip bytes; no recorded media or offline comparison code ships.
+No physical-device microphone or latency approval is claimed.
+
+## Review and tracking closure — 2026-10-20
+
+Standards review found one path portability defect in the recording-preparation
+script: passing a URL pathname to FFmpeg retained percent escapes in checkout
+paths with spaces. The script now uses `fileURLToPath`; the same spaced-path
+reproduction fails before the fix and passes after it. No other actionable
+standards defects were found. The source suite was rerun: 117 tests passed with
+one explicit external-manifest case skipped; lint, type checking and formatting
+also passed.
+
+Spec review identified three unfinished acceptance areas: qualified reference
+measurements, the three-cent accuracy target, and physical-device/latency evidence.
+The maintainer requested closure of #26; it is closed without claiming those
+requirements passed, and all remaining acceptance is consolidated under #27.
+Implementation changes remain local and uncommitted; exact release-candidate CI
+and human approval are still required.
+
+## Readable feedback presentation — 2026-10-22
+
+Raw `pitchFeedback`, detected frequencies and meter position remain live. The
+separate session snapshot field `displayPitchFeedback` holds each readable
+message for at least 1,000 ms and requires a replacement to remain a candidate
+for 260 ms. No Signal and Acquiring share the same listening guidance. Target,
+lifecycle and explicit reset changes cancel pending messages immediately, so
+stopping or changing a target cannot publish an old instruction later. React
+renders one status message with a 140 ms entrance transition; reduced motion
+removes the movement. This presentation delay is separate from estimator,
+capture and first-published-pitch latency measurements.
+
+Local validation: 119 ordinary tests passed (one explicit external-manifest
+case skipped), 18 pitch tests passed (one corresponding skip), and 53 production
+browser checks passed (three CDP-only performance cases skipped outside Chromium).
+Lint, strict types, formatting, bilingual checks, production build and the bundle
+budget passed. Desktop and phone layouts were inspected in English and Polish;
+synthetic browser audio confirmed single-message updates 1,000 ms apart and
+reduced-motion handling. No actual microphone quality or physical-device
+approval is inferred from these checks.

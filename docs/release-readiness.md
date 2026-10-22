@@ -77,7 +77,8 @@ error, wrong String/octave results, interruptions and failure notes.
    repeat in Chromatic Mode and at Concert Pitch limits (430 and 450 Hz).
 3. Measure against known references using rights-cleared recordings and real
    playing. Follow [pitch quality requirements](pitch-quality.md) and
-   [issue #26](https://github.com/damiang77/tune-every-string/issues/26).
+   [issue #27](https://github.com/damiang77/tune-every-string/issues/27), which
+   preserves the remaining acceptance after #26 was closed by maintainer request.
    Require sustained p95 error ≤3 cents; investigate Guitar latency >150 ms and
    Bass >200 ms. Record misses separately from detected-note error statistics.
 4. Deny permission, remove/busy the input, mute/disconnect it, change input,
@@ -104,7 +105,8 @@ error, wrong String/octave results, interruptions and failure notes.
 
 ## Final approval — BLOCKED
 
-- [ ] Rights-cleared recordings and actual device measurements approved in #26.
+- [ ] Qualified recorded-instrument accuracy and actual device measurements approved
+      under #27; closing #26 did not approve these checks.
 - [ ] Every supported browser/device row has evidence and named approval.
 - [ ] Manual accessibility and sustained-meter performance evidence accepted.
 - [ ] Fluent reviewer records approval of the complete interface and privacy copy
@@ -129,4 +131,5 @@ bilingual checks and the production build passed. All emitted JS including the
 worker measured 111,549 gzip bytes against the 200,000-byte budget.
 
 These are local results, not a GitHub release-candidate check run or physical
-device approval. The human and deployment blockers above remain open in #27 and #26.
+device approval. The human and deployment blockers above remain open in #27 after #26
+was closed by maintainer request.

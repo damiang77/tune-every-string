@@ -1,0 +1,435 @@
+[
+  {
+    "id": "guitar-D2",
+    "method": "Hann-windowed fundamental DFT peak; bounded golden-section optimization",
+    "kind": "offline-spectral",
+    "frequencyHz": 73.22278652153933,
+    "nominalFrequencyHz": 73.41619197935188,
+    "searchRangeCents": 50,
+    "maximumBlockDeviationCents": 0.32405153668164094,
+    "blocks": [
+      {
+        "startSeconds": 0.4,
+        "endSeconds": 0.9,
+        "frequencyHz": 73.21539811743415,
+        "searchBoundary": false
+      },
+      {
+        "startSeconds": 0.6,
+        "endSeconds": 1.1,
+        "frequencyHz": 73.2364936094616,
+        "searchBoundary": false
+      },
+      {
+        "startSeconds": 0.8,
+        "endSeconds": 1.3,
+        "frequencyHz": 73.23017492564452,
+        "searchBoundary": false
+      },
+      {
+        "startSeconds": 1,
+        "endSeconds": 1.5,
+        "frequencyHz": 73.21368695475385,
+        "searchBoundary": false
+      }
+    ],
+    "hardwareCalibration": "unavailable",
+    "referenceWarnings": [
+      "Computational reference relative to file sample clock; not physical-device calibration"
+    ]
+  },
+  {
+    "id": "guitar-Dsharp2",
+    "method": "Hann-windowed fundamental DFT peak; bounded golden-section optimization",
+    "kind": "offline-spectral",
+    "frequencyHz": 77.76423335041909,
+    "nominalFrequencyHz": 77.78174593052023,
+    "searchRangeCents": 50,
+    "maximumBlockDeviationCents": 0.7444794881644389,
+    "blocks": [
+      {
+        "startSeconds": 0.4,
+        "endSeconds": 0.9,
+        "frequencyHz": 77.73540588514318,
+        "searchBoundary": false
+      },
+      {
+        "startSeconds": 0.6,
+        "endSeconds": 1.1,
+        "frequencyHz": 77.75728452656202,
+        "searchBoundary": false
+      },
+      {
+        "startSeconds": 0.8,
+        "endSeconds": 1.3,
+        "frequencyHz": 77.77118217427616,
+        "searchBoundary": false
+      },
+      {
+        "startSeconds": 1,
+        "endSeconds": 1.5,
+        "frequencyHz": 77.79768135616862,
+        "searchBoundary": false
+      }
+    ],
+    "hardwareCalibration": "unavailable",
+    "referenceWarnings": [
+      "Computational reference relative to file sample clock; not physical-device calibration"
+    ]
+  },
+  {
+    "id": "guitar-E2",
+    "method": "Hann-windowed fundamental DFT peak; bounded golden-section optimization",
+    "kind": "offline-spectral",
+    "frequencyHz": 82.39803218529018,
+    "nominalFrequencyHz": 82.4068892282175,
+    "searchRangeCents": 50,
+    "maximumBlockDeviationCents": 0.5585941955594321,
+    "blocks": [
+      {
+        "startSeconds": 0.4,
+        "endSeconds": 0.9,
+        "frequencyHz": 82.41683088274885,
+        "searchBoundary": false
+      },
+      {
+        "startSeconds": 0.6,
+        "endSeconds": 1.1,
+        "frequencyHz": 82.40548109693881,
+        "searchBoundary": false
+      },
+      {
+        "startSeconds": 0.8,
+        "endSeconds": 1.3,
+        "frequencyHz": 82.39058327364154,
+        "searchBoundary": false
+      },
+      {
+        "startSeconds": 1,
+        "endSeconds": 1.5,
+        "frequencyHz": 82.37145020011118,
+        "searchBoundary": false
+      }
+    ],
+    "hardwareCalibration": "unavailable",
+    "referenceWarnings": [
+      "Computational reference relative to file sample clock; not physical-device calibration"
+    ]
+  },
+  {
+    "id": "guitar-A2",
+    "method": "Hann-windowed fundamental DFT peak; bounded golden-section optimization",
+    "kind": "offline-spectral",
+    "frequencyHz": 110.27263481175018,
+    "nominalFrequencyHz": 110,
+    "searchRangeCents": 50,
+    "maximumBlockDeviationCents": 31.39584908624702,
+    "blocks": [
+      {
+        "startSeconds": 0.4,
+        "endSeconds": 0.9,
+        "frequencyHz": 112.29066707737415,
+        "searchBoundary": false
+      },
+      {
+        "startSeconds": 0.6,
+        "endSeconds": 1.1,
+        "frequencyHz": 110.41357610502847,
+        "searchBoundary": false
+      },
+      {
+        "startSeconds": 0.8,
+        "endSeconds": 1.3,
+        "frequencyHz": 110.13169351847188,
+        "searchBoundary": false
+      },
+      {
+        "startSeconds": 1,
+        "endSeconds": 1.5,
+        "frequencyHz": 109.62329311256889,
+        "searchBoundary": false
+      }
+    ],
+    "hardwareCalibration": "unavailable",
+    "referenceWarnings": [
+      "Computational reference relative to file sample clock; not physical-device calibration",
+      "Reference varies by more than 3 cents between blocks"
+    ]
+  },
+  {
+    "id": "guitar-D3",
+    "method": "Hann-windowed fundamental DFT peak; bounded golden-section optimization",
+    "kind": "offline-spectral",
+    "frequencyHz": 146.91424522454975,
+    "nominalFrequencyHz": 146.8323839587038,
+    "searchRangeCents": 50,
+    "maximumBlockDeviationCents": 0.8709071100546181,
+    "blocks": [
+      {
+        "startSeconds": 0.4,
+        "endSeconds": 0.9,
+        "frequencyHz": 146.98816986163183,
+        "searchBoundary": false
+      },
+      {
+        "startSeconds": 0.6,
+        "endSeconds": 1.1,
+        "frequencyHz": 146.92184705194921,
+        "searchBoundary": false
+      },
+      {
+        "startSeconds": 0.8,
+        "endSeconds": 1.3,
+        "frequencyHz": 146.90664339715028,
+        "searchBoundary": false
+      },
+      {
+        "startSeconds": 1,
+        "endSeconds": 1.5,
+        "frequencyHz": 146.90004992122698,
+        "searchBoundary": false
+      }
+    ],
+    "hardwareCalibration": "unavailable",
+    "referenceWarnings": [
+      "Computational reference relative to file sample clock; not physical-device calibration"
+    ]
+  },
+  {
+    "id": "guitar-G3",
+    "method": "Hann-windowed fundamental DFT peak; bounded golden-section optimization",
+    "kind": "offline-spectral",
+    "frequencyHz": 195.60018204461952,
+    "nominalFrequencyHz": 195.99771799087463,
+    "searchRangeCents": 50,
+    "maximumBlockDeviationCents": 6.642537113594714,
+    "blocks": [
+      {
+        "startSeconds": 0.4,
+        "endSeconds": 0.9,
+        "frequencyHz": 195.24577567364918,
+        "searchBoundary": false
+      },
+      {
+        "startSeconds": 0.6,
+        "endSeconds": 1.1,
+        "frequencyHz": 195.4632134991955,
+        "searchBoundary": false
+      },
+      {
+        "startSeconds": 0.8,
+        "endSeconds": 1.3,
+        "frequencyHz": 195.73715059004354,
+        "searchBoundary": false
+      },
+      {
+        "startSeconds": 1,
+        "endSeconds": 1.5,
+        "frequencyHz": 196.3521180718817,
+        "searchBoundary": false
+      }
+    ],
+    "hardwareCalibration": "unavailable",
+    "referenceWarnings": [
+      "Computational reference relative to file sample clock; not physical-device calibration",
+      "Reference varies by more than 3 cents between blocks"
+    ]
+  },
+  {
+    "id": "guitar-B3",
+    "method": "Hann-windowed fundamental DFT peak; bounded golden-section optimization",
+    "kind": "offline-spectral",
+    "frequencyHz": 247.70622723364292,
+    "nominalFrequencyHz": 246.94165062806206,
+    "searchRangeCents": 50,
+    "maximumBlockDeviationCents": 3.025498484483527,
+    "blocks": [
+      {
+        "startSeconds": 0.4,
+        "endSeconds": 0.9,
+        "frequencyHz": 247.27371474811792,
+        "searchBoundary": false
+      },
+      {
+        "startSeconds": 0.6,
+        "endSeconds": 1.1,
+        "frequencyHz": 247.84663933501633,
+        "searchBoundary": false
+      },
+      {
+        "startSeconds": 0.8,
+        "endSeconds": 1.3,
+        "frequencyHz": 247.89813328135818,
+        "searchBoundary": false
+      },
+      {
+        "startSeconds": 1,
+        "endSeconds": 1.5,
+        "frequencyHz": 247.5658151322695,
+        "searchBoundary": false
+      }
+    ],
+    "hardwareCalibration": "unavailable",
+    "referenceWarnings": [
+      "Computational reference relative to file sample clock; not physical-device calibration",
+      "Reference varies by more than 3 cents between blocks"
+    ]
+  },
+  {
+    "id": "guitar-E4",
+    "method": "Hann-windowed fundamental DFT peak; bounded golden-section optimization",
+    "kind": "offline-spectral",
+    "frequencyHz": 329.61977826267264,
+    "nominalFrequencyHz": 329.6275569128699,
+    "searchRangeCents": 50,
+    "maximumBlockDeviationCents": 1.829717600320576,
+    "blocks": [
+      {
+        "startSeconds": 0.4,
+        "endSeconds": 0.9,
+        "frequencyHz": 329.968333059339,
+        "searchBoundary": false
+      },
+      {
+        "startSeconds": 0.6,
+        "endSeconds": 1.1,
+        "frequencyHz": 329.7156007982593,
+        "searchBoundary": false
+      },
+      {
+        "startSeconds": 0.8,
+        "endSeconds": 1.3,
+        "frequencyHz": 329.523955727086,
+        "searchBoundary": false
+      },
+      {
+        "startSeconds": 1,
+        "endSeconds": 1.5,
+        "frequencyHz": 329.39644911527023,
+        "searchBoundary": false
+      }
+    ],
+    "hardwareCalibration": "unavailable",
+    "referenceWarnings": [
+      "Computational reference relative to file sample clock; not physical-device calibration"
+    ]
+  },
+  {
+    "id": "bass-E",
+    "method": "Hann-windowed fundamental DFT peak; bounded golden-section optimization",
+    "kind": "offline-spectral",
+    "frequencyHz": 41.06787240166746,
+    "nominalFrequencyHz": 41.20344461410875,
+    "searchRangeCents": 50,
+    "maximumBlockDeviationCents": 2.776354019329718,
+    "blocks": [
+      {
+        "startSeconds": 0.4,
+        "endSeconds": 0.9,
+        "frequencyHz": 41.0020652531298,
+        "searchBoundary": false
+      },
+      {
+        "startSeconds": 0.6,
+        "endSeconds": 1.1,
+        "frequencyHz": 41.047237522686586,
+        "searchBoundary": false
+      },
+      {
+        "startSeconds": 0.8,
+        "endSeconds": 1.3,
+        "frequencyHz": 41.08850728064833,
+        "searchBoundary": false
+      },
+      {
+        "startSeconds": 1,
+        "endSeconds": 1.5,
+        "frequencyHz": 41.09980877550937,
+        "searchBoundary": false
+      }
+    ],
+    "hardwareCalibration": "unavailable",
+    "referenceWarnings": [
+      "Computational reference relative to file sample clock; not physical-device calibration"
+    ]
+  },
+  {
+    "id": "bass-A",
+    "method": "Hann-windowed fundamental DFT peak; bounded golden-section optimization",
+    "kind": "offline-spectral",
+    "frequencyHz": 55.333965540731256,
+    "nominalFrequencyHz": 55,
+    "searchRangeCents": 50,
+    "maximumBlockDeviationCents": 7.398039240295662,
+    "blocks": [
+      {
+        "startSeconds": 0.4,
+        "endSeconds": 0.9,
+        "frequencyHz": 55.454511244088785,
+        "searchBoundary": false
+      },
+      {
+        "startSeconds": 0.6,
+        "endSeconds": 1.1,
+        "frequencyHz": 55.381394493305585,
+        "searchBoundary": false
+      },
+      {
+        "startSeconds": 0.8,
+        "endSeconds": 1.3,
+        "frequencyHz": 55.28653658815692,
+        "searchBoundary": false
+      },
+      {
+        "startSeconds": 1,
+        "endSeconds": 1.5,
+        "frequencyHz": 55.09801279179506,
+        "searchBoundary": false
+      }
+    ],
+    "hardwareCalibration": "unavailable",
+    "referenceWarnings": [
+      "Computational reference relative to file sample clock; not physical-device calibration",
+      "Reference varies by more than 3 cents between blocks"
+    ]
+  },
+  {
+    "id": "bass-D",
+    "method": "Hann-windowed fundamental DFT peak; bounded golden-section optimization",
+    "kind": "offline-spectral",
+    "frequencyHz": 73.1924084882199,
+    "nominalFrequencyHz": 73.41619197935188,
+    "searchRangeCents": 50,
+    "maximumBlockDeviationCents": 0.5711179490487992,
+    "blocks": [
+      {
+        "startSeconds": 0.4,
+        "endSeconds": 0.9,
+        "frequencyHz": 73.21655796354042,
+        "searchBoundary": false
+      },
+      {
+        "startSeconds": 0.6,
+        "endSeconds": 1.1,
+        "frequencyHz": 73.19208034677487,
+        "searchBoundary": false
+      },
+      {
+        "startSeconds": 0.8,
+        "endSeconds": 1.3,
+        "frequencyHz": 73.19273662966492,
+        "searchBoundary": false
+      },
+      {
+        "startSeconds": 1,
+        "endSeconds": 1.5,
+        "frequencyHz": 73.18054601757859,
+        "searchBoundary": false
+      }
+    ],
+    "hardwareCalibration": "unavailable",
+    "referenceWarnings": [
+      "Computational reference relative to file sample clock; not physical-device calibration"
+    ]
+  }
+]

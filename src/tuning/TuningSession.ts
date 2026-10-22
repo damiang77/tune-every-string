@@ -32,6 +32,9 @@ import {
   type PitchFeedback,
 } from './PitchFeedbackTracker'
 
+const FEEDBACK_MESSAGE_MIN_MS = 1000
+const FEEDBACK_MESSAGE_SETTLE_MS = 260
+
 export type { DetectedPitch, PitchFeedback } from './PitchFeedbackTracker'
 
 export interface ReferenceToneOutput {
@@ -109,6 +112,7 @@ export interface TuningSessionSnapshot {
   readonly interruptionReason: MicrophoneInterruption | 'inactive' | null
   readonly microphoneError: MicrophoneError | null
   readonly pitchFeedback: PitchFeedback
+  readonly displayPitchFeedback: PitchFeedback
   readonly diagnostics: Readonly<{
     appliedAudioSettings: AudioDeviceSettings | null
     frameIntervalMs: number | null
@@ -340,6 +344,11 @@ export function createTuningSession({
   let selectedAudioInputId: string | null = null
   let microphoneError: MicrophoneError | null = null
   let pitchFeedback: TuningSessionSnapshot['pitchFeedback'] = 'no-signal'
+  let displayPitchFeedback: PitchFeedback = 'no-signal'
+  let displayedAtMs = Date.now()
+  let displayTargetKey = ''
+  let pendingDisplayFeedback: PitchFeedback | undefined
+  let displayFeedbackTimer: ReturnType<typeof setTimeout> | undefined
   let appliedAudioSettings: AudioDeviceSettings | null = null
   let sampleRateHz: number | null = null
   let signalLevel = 0
@@ -368,6 +377,7 @@ export function createTuningSession({
     pitchFeedbackTracker.reset()
     pitchFeedback = nextPitchFeedback
     competingCandidate = null
+    resetDisplayFeedback()
   }
 
   function getSelectedTarget(): TargetPitch {
@@ -441,6 +451,50 @@ export function createTuningSession({
     competingCandidate = null
   }
 
+  function clearDisplayFeedbackTimer() {
+    if (displayFeedbackTimer !== undefined) clearTimeout(displayFeedbackTimer)
+    displayFeedbackTimer = undefined
+    pendingDisplayFeedback = undefined
+  }
+
+  function resetDisplayFeedback() {
+    clearDisplayFeedbackTimer()
+    displayPitchFeedback =
+      lifecycleStatus === 'listening' ? 'acquiring' : 'no-signal'
+    displayedAtMs = Date.now()
+    displayTargetKey = ''
+  }
+
+  function updateDisplayFeedback() {
+    const context = `${lifecycleStatus}:${tuningMethod}:${instrument.id}:${tuningMode}:${getSelectedTarget().frequencyHz}`
+    if (context !== displayTargetKey) {
+      resetDisplayFeedback()
+      displayTargetKey = context
+    }
+    if (lifecycleStatus !== 'listening') return
+    const next = pitchFeedback === 'no-signal' ? 'acquiring' : pitchFeedback
+    if (next === displayPitchFeedback) {
+      clearDisplayFeedbackTimer()
+      return
+    }
+    if (next === pendingDisplayFeedback) return
+    clearDisplayFeedbackTimer()
+    pendingDisplayFeedback = next
+    // Stabilize only the human-readable message. Measurements and the meter
+    // remain live; a brief reading must not replace a readable instruction.
+    const delay = Math.max(
+      FEEDBACK_MESSAGE_SETTLE_MS,
+      displayedAtMs + FEEDBACK_MESSAGE_MIN_MS - Date.now(),
+    )
+    displayFeedbackTimer = setTimeout(() => {
+      displayFeedbackTimer = undefined
+      pendingDisplayFeedback = undefined
+      displayPitchFeedback = next
+      displayedAtMs = Date.now()
+      publishSnapshot()
+    }, delay)
+  }
+
   function createSnapshot(): TuningSessionSnapshot {
     return Object.freeze({
       accidentalPreference,
@@ -459,6 +513,7 @@ export function createTuningSession({
       interruptionReason,
       microphoneError,
       pitchFeedback,
+      displayPitchFeedback,
       diagnostics: Object.freeze({
         appliedAudioSettings,
         frameIntervalMs,
@@ -484,6 +539,7 @@ export function createTuningSession({
   let pendingCommand: Promise<void> | undefined
 
   function publishSnapshot() {
+    updateDisplayFeedback()
     snapshot = createSnapshot()
     listeners.forEach((listener) => listener())
   }

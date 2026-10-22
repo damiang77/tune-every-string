@@ -79,6 +79,10 @@ describe('recorded fixture validation and reporting', () => {
       { concertPitchHz: 460 },
       { sustainedEndSeconds: 0.1 },
       { sampleRateHz: NaN },
+      { referenceKind: 'unrecognized' },
+      { referenceMaximumDeviationCents: -1 },
+      { referenceMaximumDeviationCents: NaN },
+      { referenceEvidence: '' },
     ]) {
       expect(() => parseRecordedManifest([{ ...metadata, ...patch }])).toThrow()
     }
@@ -171,6 +175,30 @@ describe('recorded fixture validation and reporting', () => {
       summarizeRecordedFrames([], metadata).failures.length,
     ).toBeGreaterThan(0)
   })
+  it('keeps unqualified references separate from comparison accuracy', () => {
+    const unqualified = summarizeRecordedFrames([frame], metadata)
+    expect(unqualified.failures).toEqual([])
+    expect(unqualified.accuracyQualified).toBe(false)
+    expect(unqualified.acceptanceBlockers.length).toBeGreaterThan(0)
+    const qualified = summarizeRecordedFrames([frame], {
+      ...metadata,
+      referenceKind: 'independent-measurement',
+      referenceMaximumDeviationCents: 0.2,
+      referenceEvidence: 'Test calibration evidence',
+    })
+    expect(qualified.accuracyQualified).toBe(true)
+    expect(qualified.acceptanceBlockers).toEqual([])
+    const drifting = summarizeRecordedFrames([frame], {
+      ...metadata,
+      referenceKind: 'independent-measurement',
+      referenceMaximumDeviationCents: 5,
+      referenceEvidence: 'Test evidence',
+    })
+    expect(drifting.accuracyQualified).toBe(false)
+    expect(drifting.acceptanceBlockers).toContain(
+      'Reference varies by more than 3 cents; a fixed frequency cannot qualify this interval',
+    )
+  })
   it('cleans up and fails instead of reusing old feedback when estimation rejects', async () => {
     let stopped = false
     await expect(
@@ -261,7 +289,8 @@ describe.runIf(Boolean(manifestPath))(
           missed: report.missed,
           falseStrings: report.falseStrings,
           falseOctaves: report.falseOctaves,
-          failures: report.failures.join('; '),
+          accuracyQualified: report.accuracyQualified,
+          acceptanceBlockers: report.acceptanceBlockers.join('; '),
         })),
       )
       // Preserve the full report before asserting, so failed inputs remain reviewable.
@@ -270,7 +299,7 @@ describe.runIf(Boolean(manifestPath))(
       ).toEqual(new Set(['guitar', 'bass']))
       for (const report of reports)
         expect(
-          report.failures,
+          report.acceptanceBlockers,
           `${report.estimator}/${report.fixtureId}`,
         ).toEqual([])
     }, 120000)

@@ -77,13 +77,16 @@ export function TunerScreen({
       : t('tuner.instrumentPreset.guitar', { preset })
 
   const pitchFeedbackLabel = () => {
-    if (snapshot.pitchFeedback === 'no-signal')
-      return t('tuner.status.noSignal')
-    if (snapshot.pitchFeedback === 'acquiring')
-      return t('tuner.status.acquiring')
-    if (snapshot.pitchFeedback === 'too-low') return t('tuner.status.tooLow')
-    if (snapshot.pitchFeedback === 'too-high') return t('tuner.status.tooHigh')
-    return t('tuner.status.inTune')
+    switch (snapshot.displayPitchFeedback) {
+      case 'too-low':
+        return t('tuner.status.tooLow')
+      case 'too-high':
+        return t('tuner.status.tooHigh')
+      case 'in-tune':
+        return t('tuner.status.inTune')
+      default:
+        return t('tuner.status.listening')
+    }
   }
 
   const interruptionMessage = () => {
@@ -112,9 +115,7 @@ export function TunerScreen({
       : isListen && snapshot.lifecycleStatus === 'starting'
         ? t('tuner.status.starting')
         : isListening
-          ? snapshot.detectedPitch
-            ? pitchFeedbackLabel()
-            : t('tuner.status.listening')
+          ? pitchFeedbackLabel()
           : snapshot.referenceToneError
             ? t('tuner.status.error')
             : isPlaying
@@ -216,6 +217,8 @@ export function TunerScreen({
       </header>
 
       <main className={styles.main}>
+        <div aria-hidden="true" className={styles.stageDecor} />
+
         <section className={styles.setlist} aria-labelledby="tuner-heading">
           <h2 className={styles.srOnly} id="tuner-heading">
             {t('tuner.heading')}
@@ -274,61 +277,67 @@ export function TunerScreen({
             </button>
           ) : null}
 
-          <div className={styles.readout}>
-            <div className={styles.noteBlock}>
-              <strong data-target-note>{snapshot.targetPitch.noteName}</strong>
-              {showPrecisePitch ? (
-                <span className={styles.precisePitch}>
-                  {(
-                    snapshot.detectedPitch?.frequencyHz ??
-                    snapshot.targetPitch.frequencyHz
-                  ).toFixed(2)}{' '}
-                  Hz
-                </span>
-              ) : null}
+          <div className={styles.instrumentDisplay}>
+            <div className={styles.readout}>
+              <div className={styles.noteBlock}>
+                <strong data-target-note>
+                  {snapshot.targetPitch.noteName}
+                </strong>
+                {showPrecisePitch ? (
+                  <span className={styles.precisePitch}>
+                    {(
+                      snapshot.detectedPitch?.frequencyHz ??
+                      snapshot.targetPitch.frequencyHz
+                    ).toFixed(2)}{' '}
+                    Hz
+                  </span>
+                ) : null}
+              </div>
+              <span
+                aria-hidden="true"
+                className={`${styles.cueLamp} ${
+                  snapshot.pitchFeedback === 'in-tune'
+                    ? styles.cueLampInTune
+                    : isPlaying
+                      ? styles.cueLampPlaying
+                      : ''
+                }`}
+              />
             </div>
-            <span
-              aria-hidden="true"
-              className={`${styles.cueLamp} ${
-                snapshot.pitchFeedback === 'in-tune'
-                  ? styles.cueLampInTune
-                  : isPlaying
-                    ? styles.cueLampPlaying
-                    : ''
-              }`}
-            />
-          </div>
 
-          <div
-            className={`${styles.meter} ${snapshot.pitchFeedback === 'in-tune' ? styles.meterInTune : ''}`}
-            style={meterStyle}
-          >
-            <div aria-hidden="true" className={styles.tickRow}>
-              {meterTicks.map((tick) => (
-                <span
-                  className={tick === 5 ? styles.centerTick : ''}
-                  key={tick}
-                />
-              ))}
-              <i className={styles.pitchMarker} />
+            <div
+              className={`${styles.meter} ${snapshot.pitchFeedback === 'in-tune' ? styles.meterInTune : ''}`}
+              style={meterStyle}
+            >
+              <div aria-hidden="true" className={styles.tickRow}>
+                {meterTicks.map((tick) => (
+                  <span
+                    className={tick === 5 ? styles.centerTick : ''}
+                    key={tick}
+                  />
+                ))}
+                <i className={styles.pitchMarker} />
+              </div>
+              <div aria-hidden="true" className={styles.meterLabels}>
+                <span>{t('tuner.status.tooLow')}</span>
+                <span>{t('tuner.status.tooHigh')}</span>
+              </div>
             </div>
-            <div className={styles.meterLabels}>
-              <span>{t('tuner.status.tooLow')}</span>
-              <strong>{pitchFeedbackLabel()}</strong>
-              <span>{t('tuner.status.tooHigh')}</span>
-            </div>
-          </div>
 
-          <div
-            aria-atomic="true"
-            className={styles.status}
-            role={
-              snapshot.referenceToneError || snapshot.microphoneError
-                ? 'alert'
-                : 'status'
-            }
-          >
-            <p>{statusMessage}</p>
+            <div
+              aria-atomic="true"
+              className={styles.status}
+              data-feedback={
+                isListening ? snapshot.displayPitchFeedback : undefined
+              }
+              role={
+                snapshot.referenceToneError || snapshot.microphoneError
+                  ? 'alert'
+                  : 'status'
+              }
+            >
+              <p key={statusMessage}>{statusMessage}</p>
+            </div>
           </div>
 
           <button

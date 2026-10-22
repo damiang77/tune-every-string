@@ -138,23 +138,74 @@
   padding: clamp(44px, 6vh, 74px) 24px clamp(30px, 5vh, 52px);
 }
 
+.stageDecor {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  background: url('../assets/studio-gear.webp') center / cover no-repeat;
+  pointer-events: none;
+}
+
 .setlist {
   position: relative;
   z-index: 5;
   display: flex;
-  width: min(100%, 790px);
-  min-height: min(790px, calc(100svh - 122px));
+  width: min(100%, 720px);
+  min-height: 700px;
   flex-direction: column;
   align-items: center;
-  padding: clamp(52px, 7vh, 74px) clamp(28px, 6vw, 76px) 28px;
-  border: 1px solid #dce0e4;
+  padding: 38px clamp(20px, 3.8vw, 44px) 24px;
+  border: 0;
   border-radius: 16px;
-  background: #fff;
+  background: linear-gradient(125deg, #41484a, #292f31 55%, #343b3d);
+  box-shadow:
+    inset 0 2px 1px #7b8385,
+    inset 0 -4px 2px #171c1e,
+    0 22px 42px rgb(22 29 32 / 28%);
+}
+
+.setlist::before,
+.setlist::after {
+  position: absolute;
+  top: 16px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: linear-gradient(
+    135deg,
+    #9ba4a4 42%,
+    #303839 43% 56%,
+    #7a8586 57%
+  );
+  box-shadow:
+    inset 0 1px 2px #172022,
+    0 1px 1px #626c6d;
+  content: '';
+}
+
+.setlist::before {
+  left: 16px;
+}
+.setlist::after {
+  right: 16px;
+}
+
+.instrumentDisplay {
+  width: 100%;
+  margin-block: 22px 24px;
+  padding: 14px clamp(12px, 2.4vw, 28px) 4px;
+  border: 5px solid #1a2223;
+  border-radius: 12px;
+  background: linear-gradient(145deg, #e3e9d9, #d1dbc5);
+  box-shadow:
+    inset 0 3px 7px rgb(40 58 36 / 20%),
+    0 1px 1px #697273;
+  color: #273b31;
 }
 
 .preset {
   margin: 0 0 22px;
-  color: #51483f;
+  color: #e0e5df;
   font-size: clamp(0.84rem, 1.3vw, 1.05rem);
   font-weight: 680;
 }
@@ -175,10 +226,13 @@
   aspect-ratio: 1;
   justify-self: center;
   place-items: center;
-  border: 0;
+  border: 1px solid #141d20;
   border-radius: 11px;
-  background: transparent;
-  color: #575049;
+  background: linear-gradient(#596367, #343e42);
+  box-shadow:
+    inset 0 1px 1px #8d979a,
+    0 3px 4px rgb(0 0 0 / 25%);
+  color: #edf1ee;
   cursor: pointer;
   font-size: 1.05rem;
   font-weight: 780;
@@ -190,8 +244,8 @@
 }
 
 .stringRow button:hover:not([aria-pressed='true']) {
-  background: rgb(234 216 194 / 65%);
-  color: var(--ink);
+  background: #637174;
+  color: white;
 }
 
 .stringRow button:active {
@@ -234,10 +288,10 @@
   min-height: 36px;
   margin-top: 10px;
   padding: 0 14px;
-  border: 1px solid #bba58f;
+  border: 1px solid #829091;
   border-radius: 999px;
   background: transparent;
-  color: #51483f;
+  color: #e0e5df;
   cursor: pointer;
   font-size: 0.75rem;
   font-weight: 720;
@@ -258,7 +312,7 @@
 
 .chromaticLabel {
   margin: 10px 0;
-  color: var(--blue);
+  color: #b9dbf1;
   font-size: 0.78rem;
   font-weight: 780;
   letter-spacing: 0.08em;
@@ -269,7 +323,7 @@
   position: relative;
   display: grid;
   width: 100%;
-  min-height: 180px;
+  min-height: 164px;
   grid-template-columns: minmax(72px, 1fr) auto minmax(72px, 1fr);
   align-items: center;
   column-gap: clamp(18px, 3.4vw, 44px);
@@ -279,13 +333,14 @@
 .noteBlock {
   display: grid;
   grid-column: 2;
-  width: clamp(190px, 26vw, 236px);
+  width: 100%;
+  max-width: 236px;
   justify-items: center;
 }
 
 .noteBlock strong {
   max-width: 100%;
-  font-size: clamp(5rem, 13vw, 8.8rem);
+  font-size: clamp(4.5rem, 10vw, 6rem);
   font-weight: 820;
   letter-spacing: -0.04em;
   line-height: 0.86;
@@ -294,7 +349,7 @@
 .precisePitch {
   min-height: 1.5em;
   margin-top: 10px;
-  color: #51483f;
+  color: #394c3e;
   font-size: 1rem;
   font-variant-numeric: tabular-nums;
   font-weight: 700;
@@ -303,16 +358,15 @@
 .cueLamp {
   position: relative;
   grid-column: 3;
-  width: clamp(54px, 6.2vw, 72px);
+  width: clamp(36px, 4vw, 48px);
   aspect-ratio: 1;
   justify-self: start;
-  border: 6px solid #655b4f;
+  border: 4px solid #59645d;
   border-radius: 50%;
-  background: #92846b;
+  background: #536456;
   box-shadow:
-    inset 0 0 0 5px #b7a889,
-    inset 0 -8px 10px rgb(55 43 29 / 24%),
-    0 10px 18px rgb(64 48 31 / 25%);
+    inset 0 2px 5px #1f3527,
+    0 2px 3px rgb(35 46 36 / 35%);
   transition:
     box-shadow 260ms cubic-bezier(0.16, 1, 0.3, 1),
     background 260ms cubic-bezier(0.16, 1, 0.3, 1);
@@ -320,9 +374,9 @@
 
 .cueLamp::after {
   position: absolute;
-  inset: 24%;
+  inset: 14%;
   border-radius: 50%;
-  background: #cfc2a3;
+  background: linear-gradient(145deg, #879783, #4b6550);
   box-shadow: inset 0 3px 4px rgb(255 255 255 / 36%);
   content: '';
 }
@@ -341,16 +395,15 @@
 }
 
 .cueLampInTune {
-  border-color: var(--green-dark);
-  background: #42b877;
+  border-color: #36573e;
+  background: #48dc68;
   box-shadow:
-    inset 0 0 0 5px #58d58d,
-    0 0 34px rgb(47 138 91 / 62%),
-    0 8px 18px rgb(29 94 62 / 24%);
+    inset 0 2px 3px #d4ffcc,
+    0 4px 16px rgb(41 138 55 / 40%);
 }
 
 .cueLampInTune::after {
-  background: #d9ffe8;
+  background: linear-gradient(145deg, #e8ffd1, #6bf07b 55%, #26af4a);
 }
 
 .meter {
@@ -372,13 +425,13 @@
   width: 1px;
   height: 22px;
   justify-self: center;
-  background: #4b4744;
+  background: #475b49;
 }
 
 .tickRow .centerTick {
   width: 3px;
   height: 37px;
-  background: var(--blue);
+  background: #34624e;
 }
 
 .pitchMarker {
@@ -387,7 +440,7 @@
   left: var(--pitch-position);
   width: 11px;
   height: 11px;
-  background: var(--ink);
+  background: #273b31;
   clip-path: polygon(50% 0, 100% 100%, 0 100%);
   transform: translateX(-50%);
   transition: left 180ms cubic-bezier(0.16, 1, 0.3, 1);
@@ -395,18 +448,13 @@
 
 .meterLabels {
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: 1fr 1fr;
   align-items: center;
-  color: #625a53;
+  color: #425440;
   font-size: 0.66rem;
   font-weight: 780;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-}
-
-.meterLabels strong {
-  color: var(--blue);
-  font-size: 0.76rem;
 }
 
 .meterLabels span:last-child {
@@ -416,10 +464,6 @@
 .meterInTune .centerTick,
 .meterInTune .pitchMarker {
   background: var(--green);
-}
-
-.meterInTune .meterLabels strong {
-  color: var(--green);
 }
 
 .status {
@@ -433,16 +477,30 @@
 .status p {
   max-width: 58ch;
   margin: 0;
-  color: #5b524b;
+  color: #394c3e;
   font-size: clamp(0.85rem, 1.5vw, 1rem);
   font-weight: 570;
   line-height: 1.45;
+  animation: feedback-in 140ms ease-out;
+}
+
+.status[data-feedback='in-tune'] p {
+  color: var(--green-dark);
+}
+
+@keyframes feedback-in {
+  from {
+    transform: translateY(3px);
+  }
+  to {
+    transform: translateY(0);
+  }
 }
 
 .primaryAction {
   display: inline-flex;
   width: min(100%, 470px);
-  min-height: 76px;
+  min-height: 64px;
   align-items: center;
   justify-content: center;
   gap: 18px;
@@ -493,7 +551,7 @@
   border: 0;
   border-bottom: 2px solid currentColor;
   background: transparent;
-  color: #4e4a46;
+  color: #e0e5df;
   cursor: pointer;
   font-size: 0.84rem;
   font-weight: 720;
@@ -502,7 +560,7 @@
 .privacy {
   margin: auto 0 0;
   padding-top: 20px;
-  color: #6d645c;
+  color: #c2ccc7;
   font-size: 0.72rem;
   line-height: 1.45;
   text-align: center;
@@ -516,7 +574,7 @@
 }
 
 .privacy a:hover {
-  color: var(--ink);
+  color: white;
 }
 
 .privacy a:focus-visible {
@@ -767,6 +825,9 @@
 }
 
 @media (max-width: 640px) {
+  .stageDecor {
+    display: none;
+  }
   .header {
     min-height: 64px;
     padding: 10px 14px;
@@ -798,12 +859,12 @@
 
   .main {
     min-height: calc(100svh - 64px);
-    padding: 42px 12px 18px;
+    padding: 24px 12px 18px;
   }
 
   .setlist {
-    min-height: calc(100svh - 118px);
-    padding: 50px 20px 20px;
+    min-height: calc(100svh - 106px);
+    padding: 32px 18px 20px;
   }
 
   .preset {
@@ -819,7 +880,7 @@
   }
 
   .readout {
-    min-height: 164px;
+    min-height: 128px;
     grid-template-columns: minmax(0, 1fr) minmax(142px, 168px) 48px minmax(
         0,
         1fr
@@ -833,12 +894,12 @@
   }
 
   .cueLamp {
-    width: 46px;
-    border-width: 5px;
+    width: 38px;
+    border-width: 3px;
   }
 
   .cueLamp::after {
-    inset: 23%;
+    inset: 14%;
   }
 
   .tickRow {
@@ -851,6 +912,10 @@
 
   .status {
     min-height: 56px;
+  }
+
+  .instrumentDisplay {
+    margin-block: 16px 18px;
   }
 
   .primaryAction {
@@ -900,7 +965,7 @@
   }
 
   .setlist {
-    padding: 48px 14px 18px;
+    padding: 32px 12px 18px;
   }
 
   .preset {
@@ -919,7 +984,7 @@
   }
 
   .readout {
-    min-height: 152px;
+    min-height: 128px;
     grid-template-columns: minmax(0, 1fr) minmax(136px, 156px) 44px minmax(
         0,
         1fr
@@ -938,10 +1003,6 @@
   .meterLabels {
     font-size: 0.58rem;
     letter-spacing: 0.08em;
-  }
-
-  .meterLabels strong {
-    font-size: 0.66rem;
   }
 
   .status {

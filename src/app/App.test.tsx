@@ -1,9 +1,10 @@
-import { render, screen, within } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup } from '@testing-library/react'
 
 import { App } from './App'
+import styles from './TunerScreen.module.css'
 import {
   createTuningSession,
   type MicrophoneCapture,
@@ -235,10 +236,66 @@ describe('application routes', () => {
 
     await vi.waitFor(() =>
       expect(
-        within(screen.getByRole('status')).getByText('Acquiring'),
+        within(screen.getByRole('status')).getByText(
+          'Listening for a clear note.',
+        ),
       ).toBeVisible(),
     )
+    expect(screen.queryByText('Acquiring')).not.toBeInTheDocument()
+    expect(screen.getAllByText('Listening for a clear note.')).toHaveLength(1)
     expect(screen.getByRole('button', { name: 'Stop tuning' })).toBeVisible()
+    await session.dispatch({ type: 'stop' })
+  })
+
+  it('lights green as soon as a stable pitch is in tune, independently of the held message', async () => {
+    vi.useFakeTimers()
+    const microphoneInput = new ControlledMicrophoneInput()
+    const pitchEstimator = new DeferredPitchEstimator()
+    const session = createTuningSession({
+      initialTuningMethod: 'listen',
+      microphoneInput,
+      pitchEstimator,
+      referenceToneOutput: new RecordingToneOutput(),
+    })
+    const { container } = render(<App session={session} />)
+    try {
+      await act(async () => {
+        const start = session.dispatch({ type: 'start-listening' })
+        microphoneInput.finishStart()
+        await start
+      })
+      for (let index = 0; index < 3; index++) {
+        await act(async () => {
+          microphoneInput.sendFrame([0.5, -0.5], index * 50)
+          pitchEstimator.resolve({
+            clarity: 0.99,
+            frequencyHz: 82.407,
+            signalLevel: 0.5,
+          })
+          await vi.advanceTimersByTimeAsync(50)
+        })
+      }
+      expect(session.getSnapshot().pitchFeedback).toBe('in-tune')
+      expect(session.getSnapshot().displayPitchFeedback).toBe('acquiring')
+      expect(container.querySelector(`.${styles.cueLamp}`)).toHaveClass(
+        styles.cueLampInTune!,
+      )
+      await act(async () => {
+        microphoneInput.sendFrame([0, 0], 200)
+        pitchEstimator.resolve({
+          clarity: null,
+          frequencyHz: null,
+          signalLevel: 0,
+        })
+        await vi.advanceTimersByTimeAsync(0)
+      })
+      expect(container.querySelector(`.${styles.cueLamp}`)).not.toHaveClass(
+        styles.cueLampInTune!,
+      )
+    } finally {
+      await act(() => session.dispatch({ type: 'stop' }))
+      vi.useRealTimers()
+    }
   })
 
   it('shows precise pitch only when enabled in Settings', async () => {
